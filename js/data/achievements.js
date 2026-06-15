@@ -28,4 +28,9 @@ export const ACHIEVEMENTS = [
   { id: 'tier_mid', group: 'game', icon: '⚔️', title: 'Средний уровень', desc: 'Все три движения — тир «Средний»+', check: c => c.minTier >= 6 },
   { id: 'tier_adv', group: 'game', icon: '🛡️', title: 'Продвинутый', desc: 'Все три движения — тир «Продвинутый»+', check: c => c.minTier >= 9 },
   { id: 'lvl10', group: 'game', icon: '⭐', title: 'Уровень 10', desc: 'Достичь 10-го уровня', check: c => c.level >= 10 },
+
+  // --- Питание ---
+  { id: 'nutri1', group: 'game', icon: '🍎', title: 'Чистая тарелка', desc: 'Первый день по КБЖУ в норме', check: c => c.nutritionHitDays >= 1 },
+  { id: 'nutri7', group: 'game', icon: '🥗', title: 'Неделя по плану', desc: '7 дней по КБЖУ в норме', check: c => c.nutritionHitDays >= 7 },
+  { id: 'nutri30', group: 'game', icon: '🍱', title: 'Дисциплина', desc: '30 дней по КБЖУ в норме', check: c => c.nutritionHitDays >= 30 },
 ];

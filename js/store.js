@@ -1,5 +1,5 @@
 // Единое хранилище состояния поверх localStorage.
-import { STORAGE_KEY, GOAL_RATIO, uid, todayISO } from './models.js';
+import { STORAGE_KEY, GOAL_RATIO, uid, todayISO, inferMuscle } from './models.js';
 import { SEED_PLAN, SEED_STRENGTH, SEED_MEASUREMENT } from './data/seedPlan.js';
 
 function buildPlan() {
@@ -18,7 +18,19 @@ export function defaultState() {
   const today = todayISO();
   return {
     version: 1,
-    settings: { bodyweight: SEED_MEASUREMENT.weight, goalRatio: GOAL_RATIO },
+    settings: {
+      bodyweight: SEED_MEASUREMENT.weight,
+      goalRatio: GOAL_RATIO,
+      sound: true,
+      haptics: true,
+      defaultRestSec: 90,
+      reminders: { enabled: false, time: '18:00' },
+      nutrition: {
+        sex: 'male', height: 175, age: 25, activity: 1.55,
+        goalMode: 'surplus', surplusKcal: 250, proteinPerKg: 1.8,
+        manual: null, // {kcal, protein, fat, carbs} — ручное переопределение нормы
+      },
+    },
     plan: buildPlan(),
     sessions: [],
     strength: {
@@ -26,6 +38,9 @@ export function defaultState() {
       log: [{ dateISO: today, ...SEED_STRENGTH }],
     },
     measurements: [{ dateISO: today, ...SEED_MEASUREMENT }],
+    weightLog: [{ dateISO: today, weight: SEED_MEASUREMENT.weight }],
+    foods: [],          // свои продукты: {id, name, per100:{kcal,protein,fat,carbs}}
+    nutritionLog: [],   // приёмы: {id, dateISO, name, grams, kcal, protein, fat, carbs}
     game: {
       totalXp: 0,
       level: 1,
@@ -37,6 +52,7 @@ export function defaultState() {
       quests: { weekKey: null, items: [] },
       photos: [],
       xpLog: [], // [{dateISO, amount, reason}]
+      nutritionXpDates: [], // даты, за которые уже начислен XP «день в норме»
     },
   };
 }
@@ -70,7 +86,28 @@ export function save() {
 // Точка для будущих миграций версий.
 function migrate(s) {
   const def = defaultState();
-  return { ...def, ...s, game: { ...def.game, ...(s.game || {}) }, settings: { ...def.settings, ...(s.settings || {}) } };
+  const merged = {
+    ...def, ...s,
+    game: { ...def.game, ...(s.game || {}) },
+    settings: {
+      ...def.settings, ...(s.settings || {}),
+      reminders: { ...def.settings.reminders, ...((s.settings || {}).reminders || {}) },
+      nutrition: { ...def.settings.nutrition, ...((s.settings || {}).nutrition || {}) },
+    },
+  };
+  if (!Array.isArray(merged.weightLog)) merged.weightLog = def.weightLog;
+  if (!Array.isArray(merged.foods)) merged.foods = [];
+  if (!Array.isArray(merged.nutritionLog)) merged.nutritionLog = [];
+  if (!Array.isArray(merged.game.nutritionXpDates)) merged.game.nutritionXpDates = [];
+  // Проставляем группу мышц упражнениям, где её ещё нет.
+  if (merged.plan && Array.isArray(merged.plan.days)) {
+    for (const d of merged.plan.days) {
+      for (const ex of d.exercises || []) {
+        if (!ex.muscle) ex.muscle = inferMuscle(ex.name);
+      }
+    }
+  }
+  return merged;
 }
 
 export function resetAll() {

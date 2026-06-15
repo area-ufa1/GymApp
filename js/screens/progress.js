@@ -4,6 +4,7 @@ import { todayISO, weekKey } from '../models.js';
 import { lineChart, barChart } from '../lib/chart.js';
 import { epley1RM, ratio, round1, sessionTonnage, forecastDate, fmtDate, fmtNum } from '../lib/calc.js';
 import { recompute, aggregate } from '../game/gamification.js';
+import { muscleVolume, heatmapData } from '../lib/analytics.js';
 
 const FIELDS = [
   { id: 'weight', label: 'Вес, кг' },
@@ -34,8 +35,41 @@ export function render(root, ctx) {
     el('div', { class: 'forecast', html: fc ? (nowRatio >= goal ? '👑 Цель достигнута!' : `📅 Прогноз достижения: <b>${fmtDate(fc)}</b> (по текущему темпу)`) : 'Нужно ≥2 замера для прогноза' }),
   ]));
 
+  // --- Вес тела (быстрый дневник) ---
+  const wLog = [...(state.weightLog || [])].sort((a, b) => a.dateISO.localeCompare(b.dateISO));
+  const wInput = el('input', { type: 'number', inputmode: 'decimal', class: 'set-input', placeholder: wLog.length ? String(wLog[wLog.length - 1].weight) : 'кг' });
+  const lastW = wLog[wLog.length - 1];
+  const firstW = wLog[0];
+  const deltaW = (lastW && firstW) ? round1(lastW.weight - firstW.weight) : 0;
+  root.append(section('Вес тела', [
+    lineChart(wLog.map(w => ({ dateISO: w.dateISO, value: w.weight })), { empty: 'Внеси первый вес' }),
+    el('div', { class: 'weight-row' }, [
+      wInput,
+      el('button', { class: 'btn btn-primary', text: 'Записать', onClick: () => {
+        const v = parseFloat((wInput.value || '').replace(',', '.'));
+        if (!(v > 0)) { toast('Введите вес', 'warn'); return; }
+        const today = todayISO();
+        const existing = (state.weightLog || []).find(w => w.dateISO === today);
+        if (existing) existing.weight = v; else state.weightLog.push({ dateISO: today, weight: v });
+        state.settings.bodyweight = v;
+        save(); toast('Вес записан ⚖️', 'success'); ctx.rerender();
+      } }),
+    ]),
+    lastW ? el('div', { class: 'muted small', html: `Последний: <b>${lastW.weight} кг</b> · с начала: ${deltaW >= 0 ? '+' : ''}${deltaW} кг` }) : null,
+  ]));
+
   // --- Сумма 1ПМ во времени ---
   root.append(section('Сила (сумма 1ПМ)', [lineChart(strengthSeries(state), { empty: 'Вноси силовые на вкладке «Сила»' })]));
+
+  // --- Объём по группам мышц (7 дней) ---
+  const mv = muscleVolume(state, 7);
+  root.append(section('Объём по группам мышц (7 дней)', mv.length
+    ? [barChart(mv.map(m => ({ label: short(m.muscle), value: m.sets })), { empty: 'Нет данных' }),
+       el('div', { class: 'muscle-legend' }, mv.map(m => el('span', { class: 'muscle-tag', text: `${m.muscle}: ${m.sets} подх.` })))]
+    : [el('p', { class: 'muted', text: 'Сделай тренировку, чтобы увидеть распределение нагрузки.' })]));
+
+  // --- Календарь-теплокарта ---
+  root.append(section('Календарь активности', [heatmap(state)]));
 
   // --- Тоннаж и частота по неделям ---
   const weekly = weeklyAgg(state);
@@ -79,6 +113,28 @@ export function render(root, ctx) {
 }
 
 function round1Ratio(r) { return Math.round(r * 1000) / 1000; }
+
+function short(muscle) { return muscle.length > 5 ? muscle.slice(0, 4) + '.' : muscle; }
+
+function heatmap(state) {
+  const cols = heatmapData(state, 14);
+  const wrap = el('div', { class: 'heatmap' });
+  for (const col of cols) {
+    const c = el('div', { class: 'hm-col' });
+    for (const cell of col) {
+      c.append(el('div', {
+        class: `hm-cell hm-l${cell.level}` + (cell.future ? ' hm-future' : ''),
+        title: `${cell.iso}: ${cell.sets} подх.`,
+      }));
+    }
+    wrap.append(c);
+  }
+  return el('div', {}, [wrap, el('div', { class: 'hm-legend muted small' }, [
+    el('span', { text: 'меньше' }),
+    ...[0, 1, 2, 3, 4].map(l => el('span', { class: `hm-cell hm-l${l}` })),
+    el('span', { text: 'больше' }),
+  ])]);
+}
 
 function strengthSeries(state) {
   const log = [...(state.strength.log || [])].sort((a, b) => a.dateISO.localeCompare(b.dateISO));
