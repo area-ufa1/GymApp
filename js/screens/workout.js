@@ -67,6 +67,8 @@ export function render(root, ctx) {
     ]),
   ]);
 
+  const hint = el('div', { class: 'wk-hint muted small', text: 'Отмечай выполненные подходы кнопкой ✓ — только они засчитываются.' });
+
   const list = el('div', { class: 'wk-list' }, day.exercises.map((ex, exIdx) => {
     const entry = active.entries[exIdx];
     const sug = entry.suggestion;
@@ -85,7 +87,7 @@ export function render(root, ctx) {
 
   const finishBtn = el('button', { class: 'btn btn-primary btn-block', text: '✅ Завершить тренировку', onClick: () => finish(ctx) });
 
-  root.append(header, list, el('div', { class: 'wk-finish' }, [finishBtn]));
+  root.append(header, hint, list, el('div', { class: 'wk-finish' }, [finishBtn]));
 }
 
 function setRow(ex, entry, set, setIdx, prev, restSec) {
@@ -147,10 +149,11 @@ function openHistory(state, ex) {
 
 function startRest(sec) {
   stopRest();
-  const box = document.getElementById('rest-box');
-  if (!box) return;
+  if (!document.getElementById('rest-box')) return;
   const endTs = Date.now() + sec * 1000;
   const tickFn = () => {
+    const box = document.getElementById('rest-box');
+    if (!box) { if (restTimer) { clearInterval(restTimer.intervalId); restTimer = null; } return; } // ушли с экрана
     const left = Math.max(0, Math.round((endTs - Date.now()) / 1000));
     box.innerHTML = '';
     box.append(
@@ -176,11 +179,11 @@ function finish(ctx) {
   const session = {
     id: active.id, dayId: active.dayId, dateISO: active.dateISO,
     durationSec: Math.round((Date.now() - active.startTs) / 1000),
-    entries: active.entries.map(e => ({ exerciseId: e.exerciseId, sets: e.sets.filter(s => s.w && s.reps).map(s => ({ w: s.w, reps: s.reps })) })).filter(e => e.sets.length),
+    entries: active.entries.map(e => ({ exerciseId: e.exerciseId, sets: e.sets.filter(s => s.done && s.w && s.reps).map(s => ({ w: s.w, reps: s.reps })) })).filter(e => e.sets.length),
     xp: 0,
   };
   const completed = session.entries.reduce((n, e) => n + e.sets.length, 0);
-  if (completed === 0) { toast('Заполни хотя бы один подход 💪', 'warn'); return; }
+  if (completed === 0) { toast('Отметь выполненные подходы кнопкой ✓', 'warn'); return; }
 
   const res = finalizeWorkout(state, session);
   const events = recompute(state);

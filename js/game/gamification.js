@@ -232,8 +232,8 @@ function distinctDaysThisWeek(state) {
 }
 function loggedThisWeek(state) {
   const wk = thisWeekKey();
-  const s = (state.strength.log || []).some(e => weekKey(new Date(e.dateISO)) === wk);
-  const m = (state.measurements || []).some(e => weekKey(new Date(e.dateISO)) === wk);
+  const s = (state.strength.log || []).some(e => !e.seed && weekKey(new Date(e.dateISO)) === wk);
+  const m = (state.measurements || []).some(e => !e.seed && weekKey(new Date(e.dateISO)) === wk);
   return (s || m) ? 1 : 0;
 }
 
