@@ -25,6 +25,11 @@ export function defaultState() {
       haptics: true,
       defaultRestSec: 90,
       reminders: { enabled: false, time: '18:00' },
+      nutrition: {
+        sex: 'male', height: 175, age: 25, activity: 1.55,
+        goalMode: 'surplus', surplusKcal: 250, proteinPerKg: 1.8,
+        manual: null, // {kcal, protein, fat, carbs} — ручное переопределение нормы
+      },
     },
     plan: buildPlan(),
     sessions: [],
@@ -34,6 +39,8 @@ export function defaultState() {
     },
     measurements: [{ dateISO: today, ...SEED_MEASUREMENT }],
     weightLog: [{ dateISO: today, weight: SEED_MEASUREMENT.weight }],
+    foods: [],          // свои продукты: {id, name, per100:{kcal,protein,fat,carbs}}
+    nutritionLog: [],   // приёмы: {id, dateISO, name, grams, kcal, protein, fat, carbs}
     game: {
       totalXp: 0,
       level: 1,
@@ -45,6 +52,7 @@ export function defaultState() {
       quests: { weekKey: null, items: [] },
       photos: [],
       xpLog: [], // [{dateISO, amount, reason}]
+      nutritionXpDates: [], // даты, за которые уже начислен XP «день в норме»
     },
   };
 }
@@ -81,9 +89,16 @@ function migrate(s) {
   const merged = {
     ...def, ...s,
     game: { ...def.game, ...(s.game || {}) },
-    settings: { ...def.settings, ...(s.settings || {}), reminders: { ...def.settings.reminders, ...((s.settings || {}).reminders || {}) } },
+    settings: {
+      ...def.settings, ...(s.settings || {}),
+      reminders: { ...def.settings.reminders, ...((s.settings || {}).reminders || {}) },
+      nutrition: { ...def.settings.nutrition, ...((s.settings || {}).nutrition || {}) },
+    },
   };
   if (!Array.isArray(merged.weightLog)) merged.weightLog = def.weightLog;
+  if (!Array.isArray(merged.foods)) merged.foods = [];
+  if (!Array.isArray(merged.nutritionLog)) merged.nutritionLog = [];
+  if (!Array.isArray(merged.game.nutritionXpDates)) merged.game.nutritionXpDates = [];
   // Проставляем группу мышц упражнениям, где её ещё нет.
   if (merged.plan && Array.isArray(merged.plan.days)) {
     for (const d of merged.plan.days) {

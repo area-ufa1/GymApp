@@ -3,6 +3,7 @@ import { epley1RM, round1, sessionTonnage, ratio } from '../lib/calc.js';
 import { LIFTS, tierIndexFor, tierName, STRENGTH_LADDER } from '../data/strengthLevels.js';
 import { ACHIEVEMENTS } from '../data/achievements.js';
 import { weekOrdinal, weekKey, todayISO } from '../models.js';
+import { nutritionStats, computeTargets, dayTotals, dayInNorm } from '../lib/nutrition.js';
 
 const LIFT_IDS = ['squat', 'bench', 'deadlift'];
 
@@ -63,6 +64,8 @@ export function aggregate(state) {
   let tonnage = 0;
   for (const s of state.sessions || []) tonnage += sessionTonnage(s);
 
+  const nut = nutritionStats(state);
+
   const xp = state.game.totalXp || 0;
   const lp = levelProgress(xp);
 
@@ -87,7 +90,21 @@ export function aggregate(state) {
     currentStreak,
     longestStreak: state.game.longestStreak || 0,
     measurementsCount: ms.length,
+    nutritionHitDays: nut.hitDays,
+    nutritionLoggedDays: nut.loggedDays,
   };
+}
+
+// Начисляет XP за сегодняшний «день в норме» (один раз за дату). Возвращает событие или null.
+export function registerNutritionDay(state) {
+  const today = todayISO();
+  state.game.nutritionXpDates = state.game.nutritionXpDates || [];
+  if (state.game.nutritionXpDates.includes(today)) return null;
+  const target = computeTargets(state);
+  if (!dayInNorm(dayTotals(state, today), target)) return null;
+  state.game.nutritionXpDates.push(today);
+  const xp = awardXp(state, 60, 'День по КБЖУ в норме');
+  return { xp };
 }
 
 // ---- Титул по силе (синхронно с тирами) ----
@@ -192,7 +209,16 @@ const QUEST_DEFS = [
     progress: (state) => distinctDaysThisWeek(state) },
   { id: 'log', icon: '📏', text: 'Занести замер или силовой', target: 1, xp: 80,
     progress: (state) => loggedThisWeek(state) },
+  { id: 'nutrition', icon: '🍎', text: 'Попади в норму КБЖУ 3 дня', target: 3, xp: 150,
+    progress: (state) => nutritionDaysInNormThisWeek(state) },
 ];
+
+function nutritionDaysInNormThisWeek(state) {
+  const wk = thisWeekKey();
+  const target = computeTargets(state);
+  const dates = [...new Set((state.nutritionLog || []).map(e => e.dateISO))];
+  return dates.filter(d => weekKey(new Date(d)) === wk && dayInNorm(dayTotals(state, d), target)).length;
+}
 
 function thisWeekKey() { return weekKey(new Date()); }
 function sessionsThisWeek(state) {

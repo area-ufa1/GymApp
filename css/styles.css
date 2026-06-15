@@ -341,3 +341,42 @@ h3 { margin: 0; }
 
 /* --- Конфетти --- */
 .confetti-canvas { position: fixed; inset: 0; z-index: 90; pointer-events: none; }
+
+/* --- Питание --- */
+.macro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.macro-card { background: var(--bg2); border-radius: 12px; padding: 10px; }
+.macro-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.macro-label { font-size: 12px; color: var(--muted); }
+.macro-val { font-size: 12px; }
+.macro-val b { font-size: 16px; }
+.macro-val.over { color: var(--red); }
+.macro-val.under { color: var(--yellow); }
+.bar-kcal .bar-fill { background: linear-gradient(90deg, var(--pri), var(--pri2)); }
+.bar-prot .bar-fill { background: linear-gradient(90deg, #ff6b9d, #ff8fb3); }
+.bar-fat .bar-fill { background: linear-gradient(90deg, var(--gold), #ffe08a); }
+.bar-carb .bar-fill { background: linear-gradient(90deg, var(--accent), #4ee6c5); }
+.macro-note { margin-bottom: 10px; }
+
+.meal-row, .food-row { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.meal-row:last-child, .food-row:last-child { border-bottom: none; }
+.meal-main, .food-main { flex: 1; }
+.meal-name, .food-name { font-size: 14px; font-weight: 600; }
+.meal-macros, .food-macros { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.meal-kcal { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.meal-kcal b { color: var(--accent); font-size: 15px; }
+
+.meal-form { display: flex; flex-direction: column; gap: 8px; }
+.edit-lbl { font-size: 12px; color: var(--muted); }
+.edit-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.edit-row2 label, .edit-row3 label { display: flex; flex-direction: column; gap: 4px; }
+.edit-row2 .set-input, .edit-row3 .set-input { width: 100%; }
+.edit-row4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; }
+.edit-row4 .set-input { width: 100%; }
+
+.segmented { display: flex; background: var(--bg2); border-radius: 10px; padding: 3px; margin-bottom: 4px; }
+.seg { flex: 1; background: none; border: none; color: var(--muted); padding: 8px; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit; }
+.seg.on { background: var(--pri); color: #fff; font-weight: 700; }
+
+.target-preview { background: var(--bg2); border-radius: 10px; padding: 10px; font-size: 13px; color: var(--muted); margin-top: 4px; }
+.target-preview b { color: var(--accent); font-size: 16px; }
+.nutri-setup summary { cursor: pointer; padding: 4px 0; }

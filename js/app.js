@@ -4,13 +4,15 @@ import { recompute } from './game/gamification.js';
 import { scheduleReminder } from './lib/reminders.js';
 import * as home from './screens/home.js';
 import * as workout from './screens/workout.js';
+import * as nutrition from './screens/nutrition.js';
 import * as strength from './screens/strength.js';
 import * as progress from './screens/progress.js';
 import * as profile from './screens/profile.js';
 
 const SCREENS = {
   home: { mod: home, icon: '🏠', label: 'Главная' },
-  workout: { mod: workout, icon: '🏋️', label: 'Тренировка' },
+  workout: { mod: workout, icon: '🏋️', label: 'Трен.' },
+  nutrition: { mod: nutrition, icon: '🍎', label: 'Питание' },
   strength: { mod: strength, icon: '💪', label: 'Сила' },
   progress: { mod: progress, icon: '📈', label: 'Прогресс' },
   profile: { mod: profile, icon: '🎮', label: 'Профиль' },
