@@ -287,3 +287,57 @@ h3 { margin: 0; }
 .modal-head { display: flex; justify-content: space-between; align-items: center; padding: 14px; border-bottom: 1px solid var(--line); }
 .modal-body { padding: 14px; }
 .modal-actions { padding: 14px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 8px; }
+
+/* --- Авто-прогрессия / история упражнения --- */
+.wk-ex-name.link { background: none; border: none; color: var(--text); font-weight: 700; font-size: 14px; text-align: left; padding: 0; cursor: pointer; }
+.wk-ex-name.link:active { color: var(--pri2); }
+.wk-suggest { font-size: 12px; color: var(--accent); background: rgba(0,210,168,0.08); border-radius: 8px; padding: 5px 8px; margin-bottom: 8px; }
+.wk-suggest b { color: var(--text); }
+.ex-hist-list { margin-top: 10px; }
+
+/* --- Кнопка завершения подхода --- */
+.set-done-btn { background: var(--bg2); border: 1px solid var(--line); color: var(--muted); width: 30px; height: 30px; border-radius: 50%; font-size: 14px; cursor: pointer; flex: 0 0 auto; }
+.set-done-btn.on { background: var(--green); border-color: var(--green); color: #06210f; font-weight: 800; }
+.set-row.set-done .set-input { opacity: 0.7; }
+
+/* --- Вес тела --- */
+.weight-row { display: flex; gap: 8px; margin-top: 8px; }
+.weight-row .set-input { flex: 1; }
+
+/* --- Объём по мышцам --- */
+.muscle-legend { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.muscle-tag { font-size: 11px; background: var(--card2); border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px; color: var(--muted); }
+
+/* --- Календарь-теплокарта --- */
+.heatmap { display: flex; gap: 3px; overflow-x: auto; padding-bottom: 4px; }
+.hm-col { display: flex; flex-direction: column; gap: 3px; }
+.hm-cell { width: 14px; height: 14px; border-radius: 3px; background: var(--bg2); }
+.hm-l1 { background: rgba(108,92,231,0.35); }
+.hm-l2 { background: rgba(108,92,231,0.6); }
+.hm-l3 { background: rgba(108,92,231,0.85); }
+.hm-l4 { background: var(--pri2); }
+.hm-future { opacity: 0.25; }
+.hm-legend { display: flex; align-items: center; gap: 4px; margin-top: 8px; }
+.hm-legend .hm-cell { width: 11px; height: 11px; }
+
+/* --- Зал славы --- */
+.rec-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.rec-row:last-child { border-bottom: none; }
+.rec-name { font-size: 13px; font-weight: 600; }
+.rec-muscle { font-size: 11px; color: var(--muted); }
+.rec-vals { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.rec-vals b { color: var(--accent); }
+
+/* --- Настройки / переключатели --- */
+.toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 14px; gap: 12px; }
+.toggle-row:last-of-type { border-bottom: none; }
+.toggle-row select, .toggle-row input[type=time] { width: auto; min-width: 110px; }
+.switch { position: relative; width: 46px; height: 26px; flex: 0 0 auto; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; inset: 0; background: var(--bg2); border: 1px solid var(--line); border-radius: 99px; transition: 0.2s; }
+.slider::before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: var(--muted); border-radius: 50%; transition: 0.2s; }
+.switch input:checked + .slider { background: var(--pri); border-color: var(--pri); }
+.switch input:checked + .slider::before { transform: translateX(20px); background: #fff; }
+
+/* --- Конфетти --- */
+.confetti-canvas { position: fixed; inset: 0; z-index: 90; pointer-events: none; }

@@ -1,9 +1,13 @@
 import { el, section, bar, toast, modal } from '../lib/dom.js';
 import { getState, save, exportJSON, importJSON, resetAll } from '../store.js';
-import { uid } from '../models.js';
+import { uid, MUSCLE_GROUPS, inferMuscle } from '../models.js';
 import { aggregate, strengthTitle, recompute } from '../game/gamification.js';
 import { ACHIEVEMENTS } from '../data/achievements.js';
 import { STRENGTH_LADDER } from '../data/strengthLevels.js';
+import { records } from '../lib/analytics.js';
+import { fmtDate } from '../lib/calc.js';
+import { fanfare } from '../lib/effects.js';
+import { requestReminderPermission, scheduleReminder, notifySupported } from '../lib/reminders.js';
 
 const TON_MILESTONES = [
   { t: 1000, icon: '🏋️', name: '1 тонна' },
@@ -68,6 +72,16 @@ export function render(root, ctx) {
     ]);
   })));
 
+  // --- Зал славы рекордов ---
+  const recs = records(state).slice(0, 12);
+  root.append(section('🏆 Зал славы рекордов', recs.length ? recs.map(r => el('div', { class: 'rec-row' }, [
+    el('div', { class: 'rec-main' }, [
+      el('div', { class: 'rec-name', text: r.name }),
+      el('div', { class: 'rec-muscle', text: r.muscle }),
+    ]),
+    el('div', { class: 'rec-vals', html: `${r.maxW} кг · 1ПМ <b>${r.oneRm}</b>` }),
+  ])) : [el('p', { class: 'muted', text: 'Рекорды появятся после первых тренировок.' })]));
+
   // --- Фото-прогресс ---
   const photos = state.game.photos || [];
   const fileIn = el('input', { type: 'file', accept: 'image/*', class: 'hidden-file' });
@@ -83,6 +97,9 @@ export function render(root, ctx) {
     fileIn,
   ]));
 
+  // --- Настройки ---
+  root.append(settingsSection(state, ctx));
+
   // --- Редактор плана ---
   root.append(planEditor(state, ctx));
 
@@ -97,6 +114,42 @@ export function render(root, ctx) {
     ]),
     el('p', { class: 'muted small', text: 'Данные хранятся только в этом браузере. Делай экспорт для бэкапа и переноса на другое устройство.' }),
   ]));
+}
+
+function toggleRow(label, checked, onChange) {
+  const input = el('input', { type: 'checkbox' });
+  input.checked = !!checked;
+  input.addEventListener('change', () => onChange(input.checked));
+  return el('label', { class: 'toggle-row' }, [
+    el('span', { text: label }),
+    el('span', { class: 'switch' }, [input, el('span', { class: 'slider' })]),
+  ]);
+}
+
+function settingsSection(state, ctx) {
+  const s = state.settings;
+  const restSel = el('select', { class: 'set-input wide' }, [60, 90, 120, 150, 180].map(v =>
+    el('option', { value: v, text: `${v} сек`, selected: (s.defaultRestSec || 90) === v })));
+  restSel.addEventListener('change', () => { s.defaultRestSec = +restSel.value; save(); });
+
+  const timeIn = el('input', { type: 'time', class: 'set-input', value: (s.reminders && s.reminders.time) || '18:00' });
+  timeIn.addEventListener('change', () => { s.reminders.time = timeIn.value; save(); scheduleReminder(); });
+
+  return section('Настройки', [
+    toggleRow('🔊 Звук', s.sound !== false, v => { s.sound = v; save(); }),
+    toggleRow('📳 Вибрация', s.haptics !== false, v => { s.haptics = v; save(); }),
+    el('label', { class: 'toggle-row' }, [el('span', { text: '⏱ Отдых по умолчанию' }), restSel]),
+    toggleRow('🔔 Напоминания о тренировке', !!(s.reminders && s.reminders.enabled), async v => {
+      if (v) {
+        const perm = await requestReminderPermission();
+        if (perm !== 'granted') { toast(notifySupported() ? 'Разрешите уведомления в браузере' : 'Уведомления не поддерживаются', 'warn'); ctx.rerender(); return; }
+      }
+      s.reminders.enabled = v; save(); scheduleReminder();
+    }),
+    (s.reminders && s.reminders.enabled) ? el('label', { class: 'toggle-row' }, [el('span', { text: 'Время напоминания' }), timeIn]) : null,
+    el('button', { class: 'btn btn-ghost btn-block', text: '✨ Проверить эффекты', onClick: () => fanfare() }),
+    el('p', { class: 'muted small', text: 'Напоминания работают локально (без сервера): уведомление приходит, если приложение открыто/в фоне, либо при заходе после пропуска.' }),
+  ]);
 }
 
 function planEditor(state, ctx) {
@@ -131,8 +184,11 @@ function editExercise(state, day, ex, ctx) {
   const sets = el('input', { type: 'number', class: 'set-input', value: ex ? ex.sets : 3 });
   const rmin = el('input', { type: 'number', class: 'set-input', value: ex ? ex.repsMin : 8 });
   const rmax = el('input', { type: 'number', class: 'set-input', value: ex ? ex.repsMax : 12 });
+  const muscle = el('select', { class: 'set-input wide' }, MUSCLE_GROUPS.map(g =>
+    el('option', { value: g, text: g, selected: (ex ? (ex.muscle || inferMuscle(ex.name)) : 'Прочее') === g })));
   const body = el('div', { class: 'edit-form' }, [
     el('label', { text: 'Упражнение' }), name,
+    el('label', { text: 'Группа мышц' }), muscle,
     el('div', { class: 'edit-row3' }, [
       el('label', {}, [el('span', { text: 'Подходы' }), sets]),
       el('label', {}, [el('span', { text: 'Повт. от' }), rmin]),
@@ -142,7 +198,7 @@ function editExercise(state, day, ex, ctx) {
   const close = modal(ex ? 'Изменить упражнение' : 'Новое упражнение', body, [
     el('button', { class: 'btn btn-primary', text: 'Сохранить', onClick: () => {
       if (!name.value.trim()) { toast('Введите название', 'warn'); return; }
-      const data = { name: name.value.trim(), sets: +sets.value || 1, repsMin: +rmin.value || 1, repsMax: +rmax.value || 1 };
+      const data = { name: name.value.trim(), muscle: muscle.value, sets: +sets.value || 1, repsMin: +rmin.value || 1, repsMax: +rmax.value || 1 };
       if (ex) Object.assign(ex, data); else day.exercises.push({ id: uid('ex'), ...data });
       save(); close(); ctx.rerender();
     } }),

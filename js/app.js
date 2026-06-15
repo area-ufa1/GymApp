@@ -1,6 +1,7 @@
 import { clear } from './lib/dom.js';
 import { load, getState, save } from './store.js';
 import { recompute } from './game/gamification.js';
+import { scheduleReminder } from './lib/reminders.js';
 import * as home from './screens/home.js';
 import * as workout from './screens/workout.js';
 import * as strength from './screens/strength.js';
@@ -57,6 +58,7 @@ function init() {
   save();
   if (!location.hash) location.hash = '#home';
   rerender();
+  scheduleReminder();
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {

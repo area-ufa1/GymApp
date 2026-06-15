@@ -1,4 +1,5 @@
-// Мини-хелперы для DOM, тостов и модалок (без зависимостей).
+// Мини-хелперы для DOM, тостов и модалок.
+import { confetti, fanfare } from './effects.js';
 
 export function el(tag, attrs = {}, children = []) {
   const node = document.createElement(tag);
@@ -53,6 +54,8 @@ export function celebrate(emoji, title, sub) {
   const overlay = el('div', { class: 'overlay celebrate-overlay', onClick: () => overlay.remove() }, [card]);
   document.body.appendChild(overlay);
   requestAnimationFrame(() => overlay.classList.add('show'));
+  confetti();
+  fanfare();
   setTimeout(() => { overlay.classList.remove('show'); setTimeout(() => overlay.remove(), 300); }, 2200);
 }
 
