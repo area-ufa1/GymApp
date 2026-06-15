@@ -79,8 +79,10 @@ export function load() {
 export function save() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    return true;
   } catch (e) {
     console.error('Ошибка сохранения', e);
+    return false;
   }
 }
 

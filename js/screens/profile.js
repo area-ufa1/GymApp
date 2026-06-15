@@ -230,7 +230,13 @@ function handlePhoto(fileIn, ctx) {
       const state = getState();
       state.game.photos = state.game.photos || [];
       state.game.photos.push({ dateISO: new Date().toISOString().slice(0, 10), data });
-      try { save(); toast('Фото добавлено 📷', 'success'); } catch (e) { toast('Не хватило места в хранилище', 'warn'); }
+      if (save()) {
+        toast('Фото добавлено 📷', 'success');
+      } else {
+        state.game.photos.pop(); // откат, чтобы не зависло несохранённым
+        save();
+        toast('Не хватило места в хранилище для фото', 'warn');
+      }
       ctx.rerender();
     };
     img.src = reader.result;

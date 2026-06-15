@@ -89,6 +89,12 @@ export function render(root, ctx) {
     for (const f of FIELDS) { const v = inputs[f.id].value; if (v !== '') { entry[f.id] = parseFloat(v.replace(',', '.')); any = true; } else if (last[f.id] != null) { entry[f.id] = last[f.id]; } }
     if (!any) { toast('Заполни хотя бы одно поле', 'warn'); return; }
     state.measurements.push(entry);
+    // Вес тела — единый источник: дублируем в weightLog и settings.bodyweight.
+    if (entry.weight != null) {
+      const ex = (state.weightLog || []).find(w => w.dateISO === entry.dateISO);
+      if (ex) ex.weight = entry.weight; else state.weightLog.push({ dateISO: entry.dateISO, weight: entry.weight });
+      state.settings.bodyweight = entry.weight;
+    }
     const events = recompute(state);
     save();
     toast('Замер сохранён 📏', 'success');

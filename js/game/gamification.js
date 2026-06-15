@@ -150,9 +150,11 @@ function registerWorkoutWeek(state) {
 // ---- Сравнение подходов с прошлой сессией того же дня ----
 export function previousSessionForDay(state, dayId, beforeId = null) {
   const list = (state.sessions || [])
-    .filter(s => s.dayId === dayId && s.id !== beforeId)
-    .sort((a, b) => b.dateISO.localeCompare(a.dateISO) || b.id.localeCompare(a.id));
-  return list[0] || null;
+    .map((s, i) => ({ s, i }))
+    .filter(o => o.s.dayId === dayId && o.s.id !== beforeId)
+    // по дате убыв., при равенстве — по порядку добавления (поздняя запись = «предыдущая»)
+    .sort((a, b) => b.s.dateISO.localeCompare(a.s.dateISO) || b.i - a.i);
+  return list[0] ? list[0].s : null;
 }
 
 // Цвет подхода vs тот же подход в прошлой сессии: 'green' | 'yellow' | 'red' | null.
@@ -205,7 +207,7 @@ export function bosses(state, stats) {
 const QUEST_DEFS = [
   { id: 'sessions3', icon: '📅', text: '3 тренировки за неделю', target: 3, xp: 120,
     progress: (state) => sessionsThisWeek(state) },
-  { id: 'all4', icon: '🗓️', text: 'Закрыть все 4 дня недели', target: 4, xp: 200,
+  { id: 'all4', icon: '🗓️', text: 'Закрыть все дни плана за неделю', target: (state) => Math.max(1, (state.plan.days || []).length), xp: 200,
     progress: (state) => distinctDaysThisWeek(state) },
   { id: 'log', icon: '📏', text: 'Занести замер или силовой', target: 1, xp: 80,
     progress: (state) => loggedThisWeek(state) },
@@ -248,8 +250,9 @@ export function ensureQuests(state) {
 export function getQuests(state) {
   ensureQuests(state);
   return QUEST_DEFS.map(q => {
-    const progress = Math.min(q.target, q.progress(state));
-    return { ...q, progress, complete: progress >= q.target, claimed: state.game.quests.done.includes(q.id) };
+    const target = typeof q.target === 'function' ? q.target(state) : q.target;
+    const progress = Math.min(target, q.progress(state));
+    return { ...q, target, progress, complete: progress >= target, claimed: state.game.quests.done.includes(q.id) };
   });
 }
 
