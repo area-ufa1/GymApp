@@ -74,8 +74,10 @@ h3 { margin: 0; }
   border: 1px solid rgba(231, 76, 60, 0.35);
   border-radius: 12px; padding: 6px 10px; font-size: 13px; text-align: center;
 }
-.streak-chip b { font-size: 18px; display: block; }
-.streak-chip span { font-size: 10px; opacity: 0.8; }
+.streak-chip b { font-size: 18px; }
+.streak-top { line-height: 1.1; }
+.streak-sub { font-size: 10px; opacity: 0.8; margin-top: 2px; }
+.streak-chip.streak-ok { background: rgba(46, 204, 113, 0.15); color: #67e29a; border-color: rgba(46, 204, 113, 0.4); }
 .xp-row { margin: 14px 0 6px; }
 .xp-text { font-size: 12px; color: var(--muted); margin-top: 4px; }
 .hero-stats { display: flex; gap: 8px; margin-top: 12px; }

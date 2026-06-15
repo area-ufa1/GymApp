@@ -69,10 +69,7 @@ export function aggregate(state) {
   const xp = state.game.totalXp || 0;
   const lp = levelProgress(xp);
 
-  // Эффективная текущая серия (рвётся, если пропущена неделя).
-  const cw = weekOrdinal(new Date());
-  let currentStreak = state.game.currentStreak || 0;
-  if (state.game.lastStreakWeek == null || cw - state.game.lastStreakWeek > 1) currentStreak = 0;
+  const { currentStreak, longestStreak } = computeStreaks(state);
 
   return {
     oneRm,
@@ -88,7 +85,8 @@ export function aggregate(state) {
     level: lp.level,
     levelProgress: lp,
     currentStreak,
-    longestStreak: state.game.longestStreak || 0,
+    longestStreak,
+    streakNeed: streakNeed(state),
     measurementsCount: ms.length,
     nutritionHitDays: nut.hitDays,
     nutritionLoggedDays: nut.loggedDays,
@@ -135,16 +133,47 @@ export function awardXp(state, amount, reason) {
   return { amount, leveledUp, newLevel };
 }
 
-// ---- Серия по неделям ----
-function registerWorkoutWeek(state) {
-  const cw = weekOrdinal(new Date());
-  const last = state.game.lastStreakWeek;
-  if (last == null) state.game.currentStreak = 1;
-  else if (cw === last) { /* та же неделя — серия не меняется */ }
-  else if (cw - last === 1) state.game.currentStreak = (state.game.currentStreak || 0) + 1;
-  else state.game.currentStreak = 1;
-  state.game.lastStreakWeek = cw;
-  state.game.longestStreak = Math.max(state.game.longestStreak || 0, state.game.currentStreak);
+// ---- Серия по неделям (вычисляется из истории) ----
+// Неделя засчитывается, если закрыто ≥ 75% дней плана (мин. 1).
+export function streakNeed(state) {
+  return Math.max(1, Math.ceil(0.75 * ((state.plan.days || []).length || 1)));
+}
+
+// weekOrdinal -> число уникальных дней плана, закрытых на этой неделе.
+function weeklyDistinctDays(state) {
+  const map = new Map();
+  for (const s of state.sessions || []) {
+    const wo = weekOrdinal(new Date(s.dateISO));
+    let set = map.get(wo);
+    if (!set) { set = new Set(); map.set(wo, set); }
+    set.add(s.dayId);
+  }
+  const counts = new Map();
+  for (const [k, v] of map) counts.set(k, v.size);
+  return counts;
+}
+
+function computeStreaks(state) {
+  const counts = weeklyDistinctDays(state);
+  const need = streakNeed(state);
+  const qualifies = wo => (counts.get(wo) || 0) >= need;
+
+  // Текущая серия: считаем подряд идущие зачётные недели. Незавершённая текущая
+  // неделя не обнуляет серию — начинаем отсчёт с прошлой недели, если эта ещё не зачтена.
+  const cur = weekOrdinal(new Date());
+  let w = qualifies(cur) ? cur : cur - 1;
+  let currentStreak = 0;
+  while (qualifies(w)) { currentStreak++; w--; }
+
+  // Самая длинная серия за всю историю.
+  const weeks = [...counts.keys()].filter(qualifies).sort((a, b) => a - b);
+  let longest = 0, run = 0, prev = null;
+  for (const wk of weeks) {
+    run = (prev !== null && wk === prev + 1) ? run + 1 : 1;
+    prev = wk;
+    longest = Math.max(longest, run);
+  }
+  return { currentStreak, longestStreak: Math.max(longest, currentStreak) };
 }
 
 // ---- Сравнение подходов с прошлой сессией того же дня ----
@@ -186,7 +215,7 @@ export function finalizeWorkout(state, session) {
   const xpAmount = 50 + completedSets * 8 + greenSets * 20;
   session.xp = xpAmount;
   state.sessions.push(session);
-  registerWorkoutWeek(state);
+  // Серия теперь вычисляется из истории в aggregate() — отдельный апдейт не нужен.
   const xpRes = awardXp(state, xpAmount, 'Тренировка завершена');
   return { completedSets, greenSets, xp: xpRes, breakdown: { base: 50, perSet: completedSets * 8, green: greenSets * 20 } };
 }

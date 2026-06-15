@@ -1,5 +1,6 @@
 import { el, section, bar, stat } from '../lib/dom.js';
 import { getState } from '../store.js';
+import { weekOrdinal } from '../models.js';
 import { aggregate, strengthTitle, getQuests, bosses } from '../game/gamification.js';
 
 export function nextDay(state) {
@@ -25,7 +26,7 @@ export function render(root, ctx) {
         el('div', { class: 'hero-rank', text: title.name }),
         el('div', { class: 'hero-level', html: `Уровень <b>${stats.level}</b>` }),
       ]),
-      el('div', { class: 'streak-chip', html: `🔥 <b>${stats.currentStreak}</b><span>нед.</span>` }),
+      streakChip(state, stats),
     ]),
     el('div', { class: 'xp-row' }, [
       bar(lp.pct),
@@ -74,6 +75,18 @@ export function render(root, ctx) {
   ])));
 
   root.append(hero, todayCard, questCard, bossCard);
+}
+
+function streakChip(state, stats) {
+  const cw = weekOrdinal(new Date());
+  const daysThisWeek = new Set((state.sessions || [])
+    .filter(s => weekOrdinal(new Date(s.dateISO)) === cw)
+    .map(s => s.dayId)).size;
+  const done = daysThisWeek >= stats.streakNeed;
+  return el('div', { class: 'streak-chip' + (done ? ' streak-ok' : '') }, [
+    el('div', { class: 'streak-top', html: `🔥 <b>${stats.currentStreak}</b>` }),
+    el('div', { class: 'streak-sub', text: `нед. · ${Math.min(daysThisWeek, stats.streakNeed)}/${stats.streakNeed}` }),
+  ]);
 }
 
 function fmt(x) {
