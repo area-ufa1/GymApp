@@ -1,5 +1,7 @@
-// Офлайн-кэш оболочки приложения. Стратегия: cache-first для своих ассетов.
-const CACHE = 'gymquest-v4';
+// Офлайн-кэш оболочки приложения.
+// Стратегия: network-first для своих ресурсов (свежий код при наличии сети),
+// кэш — офлайн-фоллбэк. Так обновления подхватываются сразу, а не «залипают».
+const CACHE = 'gymquest-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -40,15 +42,20 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  if (!req.url.startsWith(self.location.origin)) return; // сторонние ресурсы не трогаем
+
+  // Network-first: берём свежую версию, обновляем кэш; офлайн — отдаём из кэша.
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request).then(resp => {
-      // Кэшируем успешно загруженные собственные ресурсы.
-      if (resp.ok && e.request.url.startsWith(self.location.origin)) {
-        const copy = resp.clone();
-        caches.open(CACHE).then(c => c.put(e.request, copy));
-      }
-      return resp;
-    }).catch(() => caches.match('./index.html')))
+    fetch(req)
+      .then(resp => {
+        if (resp && resp.ok) {
+          const copy = resp.clone();
+          caches.open(CACHE).then(c => c.put(req, copy));
+        }
+        return resp;
+      })
+      .catch(() => caches.match(req).then(cached => cached || caches.match('./index.html')))
   );
 });
