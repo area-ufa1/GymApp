@@ -69,10 +69,7 @@ export function aggregate(state) {
   const xp = state.game.totalXp || 0;
   const lp = levelProgress(xp);
 
-  // Эффективная текущая серия (рвётся, если пропущена неделя).
-  const cw = weekOrdinal(new Date());
-  let currentStreak = state.game.currentStreak || 0;
-  if (state.game.lastStreakWeek == null || cw - state.game.lastStreakWeek > 1) currentStreak = 0;
+  const { currentStreak, longestStreak } = computeStreaks(state);
 
   return {
     oneRm,
@@ -88,23 +85,31 @@ export function aggregate(state) {
     level: lp.level,
     levelProgress: lp,
     currentStreak,
-    longestStreak: state.game.longestStreak || 0,
+    longestStreak,
+    streakNeed: streakNeed(state),
     measurementsCount: ms.length,
     nutritionHitDays: nut.hitDays,
     nutritionLoggedDays: nut.loggedDays,
   };
 }
 
-// Начисляет XP за сегодняшний «день в норме» (один раз за дату). Возвращает событие или null.
-export function registerNutritionDay(state) {
-  const today = todayISO();
+// Сверяет начисленный «дневной» XP с фактическим статусом дня:
+// начисляет +60, если день вошёл в норму, и откатывает −60, если вышел из неё.
+// Возвращает { type: 'award' | 'revoke', xp } или null.
+export function reconcileNutritionDay(state, dateISO = todayISO()) {
   state.game.nutritionXpDates = state.game.nutritionXpDates || [];
-  if (state.game.nutritionXpDates.includes(today)) return null;
   const target = computeTargets(state);
-  if (!dayInNorm(dayTotals(state, today), target)) return null;
-  state.game.nutritionXpDates.push(today);
-  const xp = awardXp(state, 60, 'День по КБЖУ в норме');
-  return { xp };
+  const inNorm = dayInNorm(dayTotals(state, dateISO), target);
+  const claimed = state.game.nutritionXpDates.includes(dateISO);
+  if (inNorm && !claimed) {
+    state.game.nutritionXpDates.push(dateISO);
+    return { type: 'award', xp: awardXp(state, 60, 'День по КБЖУ в норме') };
+  }
+  if (!inNorm && claimed) {
+    state.game.nutritionXpDates = state.game.nutritionXpDates.filter(d => d !== dateISO);
+    return { type: 'revoke', xp: awardXp(state, -60, 'Откат: день вышел из нормы КБЖУ') };
+  }
+  return null;
 }
 
 // ---- Титул по силе (синхронно с тирами) ----
@@ -126,7 +131,7 @@ export function rankEmoji(name) {
 // ---- XP ----
 export function awardXp(state, amount, reason) {
   amount = Math.round(amount);
-  state.game.totalXp = (state.game.totalXp || 0) + amount;
+  state.game.totalXp = Math.max(0, (state.game.totalXp || 0) + amount);
   state.game.xpLog = state.game.xpLog || [];
   state.game.xpLog.push({ dateISO: todayISO(), amount, reason });
   const newLevel = levelForXp(state.game.totalXp);
@@ -135,24 +140,57 @@ export function awardXp(state, amount, reason) {
   return { amount, leveledUp, newLevel };
 }
 
-// ---- Серия по неделям ----
-function registerWorkoutWeek(state) {
-  const cw = weekOrdinal(new Date());
-  const last = state.game.lastStreakWeek;
-  if (last == null) state.game.currentStreak = 1;
-  else if (cw === last) { /* та же неделя — серия не меняется */ }
-  else if (cw - last === 1) state.game.currentStreak = (state.game.currentStreak || 0) + 1;
-  else state.game.currentStreak = 1;
-  state.game.lastStreakWeek = cw;
-  state.game.longestStreak = Math.max(state.game.longestStreak || 0, state.game.currentStreak);
+// ---- Серия по неделям (вычисляется из истории) ----
+// Неделя засчитывается, если закрыто ≥ 75% дней плана (мин. 1).
+export function streakNeed(state) {
+  return Math.max(1, Math.ceil(0.75 * ((state.plan.days || []).length || 1)));
+}
+
+// weekOrdinal -> число уникальных дней плана, закрытых на этой неделе.
+function weeklyDistinctDays(state) {
+  const map = new Map();
+  for (const s of state.sessions || []) {
+    const wo = weekOrdinal(new Date(s.dateISO));
+    let set = map.get(wo);
+    if (!set) { set = new Set(); map.set(wo, set); }
+    set.add(s.dayId);
+  }
+  const counts = new Map();
+  for (const [k, v] of map) counts.set(k, v.size);
+  return counts;
+}
+
+function computeStreaks(state) {
+  const counts = weeklyDistinctDays(state);
+  const need = streakNeed(state);
+  const qualifies = wo => (counts.get(wo) || 0) >= need;
+
+  // Текущая серия: считаем подряд идущие зачётные недели. Незавершённая текущая
+  // неделя не обнуляет серию — начинаем отсчёт с прошлой недели, если эта ещё не зачтена.
+  const cur = weekOrdinal(new Date());
+  let w = qualifies(cur) ? cur : cur - 1;
+  let currentStreak = 0;
+  while (qualifies(w)) { currentStreak++; w--; }
+
+  // Самая длинная серия за всю историю.
+  const weeks = [...counts.keys()].filter(qualifies).sort((a, b) => a - b);
+  let longest = 0, run = 0, prev = null;
+  for (const wk of weeks) {
+    run = (prev !== null && wk === prev + 1) ? run + 1 : 1;
+    prev = wk;
+    longest = Math.max(longest, run);
+  }
+  return { currentStreak, longestStreak: Math.max(longest, currentStreak) };
 }
 
 // ---- Сравнение подходов с прошлой сессией того же дня ----
 export function previousSessionForDay(state, dayId, beforeId = null) {
   const list = (state.sessions || [])
-    .filter(s => s.dayId === dayId && s.id !== beforeId)
-    .sort((a, b) => b.dateISO.localeCompare(a.dateISO) || b.id.localeCompare(a.id));
-  return list[0] || null;
+    .map((s, i) => ({ s, i }))
+    .filter(o => o.s.dayId === dayId && o.s.id !== beforeId)
+    // по дате убыв., при равенстве — по порядку добавления (поздняя запись = «предыдущая»)
+    .sort((a, b) => b.s.dateISO.localeCompare(a.s.dateISO) || b.i - a.i);
+  return list[0] ? list[0].s : null;
 }
 
 // Цвет подхода vs тот же подход в прошлой сессии: 'green' | 'yellow' | 'red' | null.
@@ -184,7 +222,7 @@ export function finalizeWorkout(state, session) {
   const xpAmount = 50 + completedSets * 8 + greenSets * 20;
   session.xp = xpAmount;
   state.sessions.push(session);
-  registerWorkoutWeek(state);
+  // Серия теперь вычисляется из истории в aggregate() — отдельный апдейт не нужен.
   const xpRes = awardXp(state, xpAmount, 'Тренировка завершена');
   return { completedSets, greenSets, xp: xpRes, breakdown: { base: 50, perSet: completedSets * 8, green: greenSets * 20 } };
 }
@@ -205,7 +243,7 @@ export function bosses(state, stats) {
 const QUEST_DEFS = [
   { id: 'sessions3', icon: '📅', text: '3 тренировки за неделю', target: 3, xp: 120,
     progress: (state) => sessionsThisWeek(state) },
-  { id: 'all4', icon: '🗓️', text: 'Закрыть все 4 дня недели', target: 4, xp: 200,
+  { id: 'all4', icon: '🗓️', text: 'Закрыть все дни плана за неделю', target: (state) => Math.max(1, (state.plan.days || []).length), xp: 200,
     progress: (state) => distinctDaysThisWeek(state) },
   { id: 'log', icon: '📏', text: 'Занести замер или силовой', target: 1, xp: 80,
     progress: (state) => loggedThisWeek(state) },
@@ -232,8 +270,8 @@ function distinctDaysThisWeek(state) {
 }
 function loggedThisWeek(state) {
   const wk = thisWeekKey();
-  const s = (state.strength.log || []).some(e => weekKey(new Date(e.dateISO)) === wk);
-  const m = (state.measurements || []).some(e => weekKey(new Date(e.dateISO)) === wk);
+  const s = (state.strength.log || []).some(e => !e.seed && weekKey(new Date(e.dateISO)) === wk);
+  const m = (state.measurements || []).some(e => !e.seed && weekKey(new Date(e.dateISO)) === wk);
   return (s || m) ? 1 : 0;
 }
 
@@ -248,8 +286,9 @@ export function ensureQuests(state) {
 export function getQuests(state) {
   ensureQuests(state);
   return QUEST_DEFS.map(q => {
-    const progress = Math.min(q.target, q.progress(state));
-    return { ...q, progress, complete: progress >= q.target, claimed: state.game.quests.done.includes(q.id) };
+    const target = typeof q.target === 'function' ? q.target(state) : q.target;
+    const progress = Math.min(target, q.progress(state));
+    return { ...q, target, progress, complete: progress >= target, claimed: state.game.quests.done.includes(q.id) };
   });
 }
 

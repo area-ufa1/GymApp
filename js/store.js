@@ -34,11 +34,12 @@ export function defaultState() {
     plan: buildPlan(),
     sessions: [],
     strength: {
-      // лог силовых: каждая запись — лучший подход по движению на дату
-      log: [{ dateISO: today, ...SEED_STRENGTH }],
+      // лог силовых: каждая запись — лучший подход по движению на дату.
+      // seed:true — стартовые значения, не считаются «действием этой недели» для квестов.
+      log: [{ dateISO: today, seed: true, ...SEED_STRENGTH }],
     },
-    measurements: [{ dateISO: today, ...SEED_MEASUREMENT }],
-    weightLog: [{ dateISO: today, weight: SEED_MEASUREMENT.weight }],
+    measurements: [{ dateISO: today, seed: true, ...SEED_MEASUREMENT }],
+    weightLog: [{ dateISO: today, seed: true, weight: SEED_MEASUREMENT.weight }],
     foods: [],          // свои продукты: {id, name, per100:{kcal,protein,fat,carbs}}
     nutritionLog: [],   // приёмы: {id, dateISO, name, grams, kcal, protein, fat, carbs}
     game: {
@@ -78,8 +79,10 @@ export function load() {
 export function save() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    return true;
   } catch (e) {
     console.error('Ошибка сохранения', e);
+    return false;
   }
 }
 

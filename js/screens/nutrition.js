@@ -1,9 +1,9 @@
-import { el, section, bar, toast, celebrate, modal } from '../lib/dom.js';
+import { el, section, bar, toast, celebrate, celebrateQueue, modal } from '../lib/dom.js';
 import { getState, save } from '../store.js';
 import { uid, todayISO } from '../models.js';
 import { barChart } from '../lib/chart.js';
 import { computeTargets, dayTotals, macrosFromFood, ACTIVITY_LEVELS, bodyweightOf } from '../lib/nutrition.js';
-import { recompute, registerNutritionDay } from '../game/gamification.js';
+import { recompute, reconcileNutritionDay } from '../game/gamification.js';
 
 const MACROS = [
   { key: 'kcal', label: 'Ккал', unit: '', color: 'kcal' },
@@ -48,7 +48,7 @@ export function render(root, ctx) {
       el('div', { class: 'meal-macros', text: `${e.grams ? e.grams + ' г · ' : ''}Б ${e.protein} · Ж ${e.fat} · У ${e.carbs}` }),
     ]),
     el('div', { class: 'meal-kcal', html: `<b>${e.kcal}</b> ккал` }),
-    el('button', { class: 'icon-btn', text: '✕', onClick: () => { state.nutritionLog = state.nutritionLog.filter(x => x.id !== e.id); afterChange(state, ctx, false); } }),
+    el('button', { class: 'icon-btn', text: '✕', onClick: () => { state.nutritionLog = state.nutritionLog.filter(x => x.id !== e.id); afterChange(state, ctx); } }),
   ])) : [el('p', { class: 'muted', text: 'Пока ничего не добавлено сегодня.' })]));
 
   // --- График калорий за неделю ---
@@ -142,18 +142,24 @@ function num(input) { return parseFloat((input.value || '').replace(',', '.')) |
 function addEntry(state, ctx, close, data) {
   state.nutritionLog.push({ id: uid('meal'), dateISO: todayISO(), ...data });
   close();
-  afterChange(state, ctx, true);
+  afterChange(state, ctx);
 }
 
-// Пересчёт геймификации после изменения дневника.
-function afterChange(state, ctx, allowReward) {
-  let nutriEvent = null;
-  if (allowReward) nutriEvent = registerNutritionDay(state);
+// Пересчёт геймификации после любого изменения дневника (добавление/удаление).
+function afterChange(state, ctx) {
+  const beforeLevel = state.game.level;
+  const nutriEvent = reconcileNutritionDay(state);
   const events = recompute(state);
   save();
-  if (nutriEvent) { toast(`🍎 День по КБЖУ в норме! +${nutriEvent.xp.amount} XP`, 'success'); celebrate('🥗', 'День по плану!', 'КБЖУ в норме (+60 XP)'); }
-  for (const a of events.newAchievements) celebrate(a.icon, a.title, 'Ачивка разблокирована');
-  for (const q of events.newQuests) toast(`🎯 Квест: ${q.text} (+${q.xp} XP)`, 'success');
+
+  const cel = [];
+  if (state.game.level > beforeLevel) cel.push(['⭐', `Уровень ${state.game.level}!`, 'Новый уровень достигнут']);
+  if (nutriEvent && nutriEvent.type === 'award') cel.push(['🥗', 'День по плану!', 'КБЖУ в норме (+60 XP)']);
+  for (const a of events.newAchievements) cel.push([a.icon, a.title, 'Ачивка разблокирована']);
+  for (const q of events.newQuests) cel.push(['🎯', 'Квест выполнен', `${q.text} (+${q.xp} XP)`]);
+  celebrateQueue(cel);
+
+  if (nutriEvent && nutriEvent.type === 'revoke') toast('Запись изменена: день вышел из нормы, −60 XP', 'warn');
   ctx.rerender();
 }
 

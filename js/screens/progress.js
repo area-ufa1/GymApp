@@ -1,4 +1,4 @@
-import { el, section, toast } from '../lib/dom.js';
+import { el, section, toast, celebrateQueue } from '../lib/dom.js';
 import { getState, save } from '../store.js';
 import { todayISO, weekKey } from '../models.js';
 import { lineChart, barChart } from '../lib/chart.js';
@@ -88,11 +88,21 @@ export function render(root, ctx) {
     let any = false;
     for (const f of FIELDS) { const v = inputs[f.id].value; if (v !== '') { entry[f.id] = parseFloat(v.replace(',', '.')); any = true; } else if (last[f.id] != null) { entry[f.id] = last[f.id]; } }
     if (!any) { toast('Заполни хотя бы одно поле', 'warn'); return; }
+    const beforeLevel = state.game.level;
     state.measurements.push(entry);
+    // Вес тела — единый источник: дублируем в weightLog и settings.bodyweight.
+    if (entry.weight != null) {
+      const ex = (state.weightLog || []).find(w => w.dateISO === entry.dateISO);
+      if (ex) ex.weight = entry.weight; else state.weightLog.push({ dateISO: entry.dateISO, weight: entry.weight });
+      state.settings.bodyweight = entry.weight;
+    }
     const events = recompute(state);
     save();
     toast('Замер сохранён 📏', 'success');
-    events.newAchievements.forEach(a => toast(`${a.icon} ${a.title}`, 'success'));
+    const cel = [];
+    if (state.game.level > beforeLevel) cel.push(['⭐', `Уровень ${state.game.level}!`, 'Новый уровень достигнут']);
+    for (const a of events.newAchievements) cel.push([a.icon, a.title, 'Ачивка разблокирована']);
+    celebrateQueue(cel);
     ctx.rerender();
   } });
   root.append(section('Новый замер тела', [form, addBtn]));

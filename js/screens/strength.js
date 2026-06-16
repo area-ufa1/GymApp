@@ -1,4 +1,4 @@
-import { el, section, toast, celebrate } from '../lib/dom.js';
+import { el, section, toast, celebrateQueue } from '../lib/dom.js';
 import { getState, save } from '../store.js';
 import { todayISO } from '../models.js';
 import { parseSet, epley1RM, round1 } from '../lib/calc.js';
@@ -61,6 +61,7 @@ function addRecord(ctx, liftId, raw) {
   const parsed = parseSet(raw);
   if (!parsed) { toast('Формат: «вес×повт», напр. 100×5', 'warn'); return; }
   const state = getState();
+  const beforeLevel = state.game.level;
   const before = aggregate(state).oneRm[liftId];
   state.strength.log.push({ dateISO: todayISO(), [liftId]: parsed });
   const rm = round1(epley1RM(parsed.w, parsed.reps));
@@ -74,14 +75,9 @@ function addRecord(ctx, liftId, raw) {
   } else {
     toast(`Записано: 1ПМ ${rm} кг`, 'info');
   }
-  const queue = [];
-  for (const a of events.newAchievements) queue.push([a.icon, a.title, 'Ачивка разблокирована']);
-  playQueue(queue);
+  const cel = [];
+  if (state.game.level > beforeLevel) cel.push(['⭐', `Уровень ${state.game.level}!`, 'Новый уровень достигнут']);
+  for (const a of events.newAchievements) cel.push([a.icon, a.title, 'Ачивка разблокирована']);
+  celebrateQueue(cel);
   ctx.rerender();
-}
-
-function playQueue(queue) {
-  let i = 0;
-  const next = () => { if (i < queue.length) { const [e, t, s] = queue[i++]; celebrate(e, t, s); setTimeout(next, 2300); } };
-  next();
 }
