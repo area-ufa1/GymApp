@@ -59,6 +59,19 @@ export function celebrate(emoji, title, sub) {
   setTimeout(() => { overlay.classList.remove('show'); setTimeout(() => overlay.remove(), 300); }, 2200);
 }
 
+// Последовательный показ нескольких празднований. items: [[emoji, title, sub], ...]
+export function celebrateQueue(items) {
+  if (!items || !items.length) return;
+  let i = 0;
+  const next = () => {
+    if (i >= items.length) return;
+    const [e, t, s] = items[i++];
+    celebrate(e, t, s);
+    setTimeout(next, 2300);
+  };
+  next();
+}
+
 // Модальное окно с произвольным содержимым. Возвращает функцию закрытия.
 export function modal(title, contentNode, actions = []) {
   const box = el('div', { class: 'modal' }, [

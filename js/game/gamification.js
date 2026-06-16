@@ -93,16 +93,23 @@ export function aggregate(state) {
   };
 }
 
-// Начисляет XP за сегодняшний «день в норме» (один раз за дату). Возвращает событие или null.
-export function registerNutritionDay(state) {
-  const today = todayISO();
+// Сверяет начисленный «дневной» XP с фактическим статусом дня:
+// начисляет +60, если день вошёл в норму, и откатывает −60, если вышел из неё.
+// Возвращает { type: 'award' | 'revoke', xp } или null.
+export function reconcileNutritionDay(state, dateISO = todayISO()) {
   state.game.nutritionXpDates = state.game.nutritionXpDates || [];
-  if (state.game.nutritionXpDates.includes(today)) return null;
   const target = computeTargets(state);
-  if (!dayInNorm(dayTotals(state, today), target)) return null;
-  state.game.nutritionXpDates.push(today);
-  const xp = awardXp(state, 60, 'День по КБЖУ в норме');
-  return { xp };
+  const inNorm = dayInNorm(dayTotals(state, dateISO), target);
+  const claimed = state.game.nutritionXpDates.includes(dateISO);
+  if (inNorm && !claimed) {
+    state.game.nutritionXpDates.push(dateISO);
+    return { type: 'award', xp: awardXp(state, 60, 'День по КБЖУ в норме') };
+  }
+  if (!inNorm && claimed) {
+    state.game.nutritionXpDates = state.game.nutritionXpDates.filter(d => d !== dateISO);
+    return { type: 'revoke', xp: awardXp(state, -60, 'Откат: день вышел из нормы КБЖУ') };
+  }
+  return null;
 }
 
 // ---- Титул по силе (синхронно с тирами) ----
@@ -124,7 +131,7 @@ export function rankEmoji(name) {
 // ---- XP ----
 export function awardXp(state, amount, reason) {
   amount = Math.round(amount);
-  state.game.totalXp = (state.game.totalXp || 0) + amount;
+  state.game.totalXp = Math.max(0, (state.game.totalXp || 0) + amount);
   state.game.xpLog = state.game.xpLog || [];
   state.game.xpLog.push({ dateISO: todayISO(), amount, reason });
   const newLevel = levelForXp(state.game.totalXp);
