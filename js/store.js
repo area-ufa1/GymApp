@@ -1,5 +1,5 @@
 // Единое хранилище состояния поверх localStorage.
-import { STORAGE_KEY, GOAL_RATIO, uid, todayISO, inferMuscle } from './models.js';
+import { STORAGE_KEY, GOAL_RATIO, uid, todayISO, inferMuscle, weekKey } from './models.js';
 import { SEED_PLAN, SEED_STRENGTH, SEED_MEASUREMENT } from './data/seedPlan.js';
 
 function buildPlan() {
@@ -17,7 +17,7 @@ function buildPlan() {
 export function defaultState() {
   const today = todayISO();
   return {
-    version: 1,
+    version: 2,
     settings: {
       bodyweight: SEED_MEASUREMENT.weight,
       goalRatio: GOAL_RATIO,
@@ -110,6 +110,29 @@ function migrate(s) {
       }
     }
   }
+
+  // v1 → v2: разово снять ошибочно начисленные стартовые XP за квест «Занеси замер/
+  // силовой», который раньше автозачитывался по seed-данным (баг стартовых 80 XP).
+  if ((s.version || 1) < 2) {
+    const wk = weekKey(new Date());
+    const q = merged.game.quests;
+    if (q && q.weekKey === wk && Array.isArray(q.done) && q.done.includes('log')) {
+      const realLog =
+        (merged.strength.log || []).some(e => !e.seed && weekKey(new Date(e.dateISO)) === wk) ||
+        (merged.measurements || []).some(e => !e.seed && weekKey(new Date(e.dateISO)) === wk);
+      if (!realLog) {
+        q.done = q.done.filter(id => id !== 'log');
+        merged.game.totalXp = Math.max(0, (merged.game.totalXp || 0) - 80);
+        const idx = (merged.game.xpLog || []).findIndex(e => e.reason && e.reason.includes('Занести замер'));
+        if (idx >= 0) merged.game.xpLog.splice(idx, 1);
+      }
+    }
+    // Пересчёт уровня по скорректированному XP (та же формула, что в gamification).
+    let L = 1;
+    while (50 * (L + 1) * L <= (merged.game.totalXp || 0)) L++;
+    merged.game.level = L;
+  }
+  merged.version = 2;
   return merged;
 }
 
