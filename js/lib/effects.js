@@ -60,6 +60,7 @@ export function confetti(count = 90) {
   canvas.width = window.innerWidth * dpr;
   canvas.height = window.innerHeight * dpr;
   const g = canvas.getContext('2d');
+  if (!g) return; // canvas недоступен — пропускаем эффект
   g.scale(dpr, dpr);
   document.body.appendChild(canvas);
   const W = window.innerWidth, H = window.innerHeight;

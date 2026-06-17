@@ -62,6 +62,12 @@ function init() {
   rerender();
   scheduleReminder();
 
+  // Флаш-сохранение при сворачивании/выгрузке страницы — чтобы незавершённая
+  // тренировка и прочее состояние не терялись при переключении вкладок/приложений.
+  const flush = () => { try { save(); } catch (e) { /* ignore */ } };
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
+  window.addEventListener('pagehide', flush);
+
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('./service-worker.js').catch(e => console.warn('SW не зарегистрирован', e));

@@ -42,6 +42,7 @@ export function defaultState() {
     weightLog: [{ dateISO: today, seed: true, weight: SEED_MEASUREMENT.weight }],
     foods: [],          // свои продукты: {id, name, per100:{kcal,protein,fat,carbs}}
     nutritionLog: [],   // приёмы: {id, dateISO, name, grams, kcal, protein, fat, carbs}
+    activeWorkout: null, // незавершённая тренировка (восстанавливается при возврате)
     game: {
       totalXp: 0,
       level: 1,

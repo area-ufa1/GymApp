@@ -7,8 +7,12 @@ import { finalizeWorkout, recompute, previousSessionForDay, compareSet } from '.
 import { suggestProgression, exerciseHistory } from '../lib/analytics.js';
 import { restEndCue, tick } from '../lib/effects.js';
 
-let active = null;      // активная сессия в памяти
+let active = null;      // ссылка на state.activeWorkout (он же — источник истины)
 let restTimer = null;   // {endTs, intervalId}
+let saveTimer = null;   // дебаунс сохранения при вводе
+
+function persist() { clearTimeout(saveTimer); saveTimer = setTimeout(() => save(), 400); }
+function persistNow() { clearTimeout(saveTimer); save(); }
 
 function startActive(state, dayId) {
   const day = state.plan.days.find(d => d.id === dayId);
@@ -33,7 +37,15 @@ function startActive(state, dayId) {
       };
     }),
   };
+  state.activeWorkout = active; // персистим незавершённую тренировку
+  save();
   return active;
+}
+
+// Восстановленная тренировка валидна, только если совпадает набор упражнений дня.
+function matchesDay(aw, day) {
+  return aw && Array.isArray(aw.entries) && aw.entries.length === day.exercises.length &&
+    aw.entries.every((e, i) => e.exerciseId === day.exercises[i].id);
 }
 
 export function render(root, ctx) {
@@ -41,19 +53,24 @@ export function render(root, ctx) {
   const dayId = ctx.param;
 
   if (!dayId) {
-    root.append(section('Выбери день', state.plan.days.map(d => el('button', {
-      class: 'day-pick', onClick: () => ctx.navigate(`workout/${d.id}`),
-    }, [
-      el('div', { class: 'day-pick-name', text: d.name }),
-      el('div', { class: 'day-pick-focus', text: d.focus }),
-      el('div', { class: 'day-pick-meta', text: `${d.exercises.length} упр.` }),
-    ]))));
+    root.append(section('Выбери день', state.plan.days.map(d => {
+      const inProgress = state.activeWorkout && state.activeWorkout.dayId === d.id;
+      return el('button', { class: 'day-pick' + (inProgress ? ' day-pick-active' : ''), onClick: () => ctx.navigate(`workout/${d.id}`) }, [
+        el('div', { class: 'day-pick-name', text: d.name }),
+        el('div', { class: 'day-pick-focus', text: d.focus }),
+        el('div', { class: 'day-pick-meta', text: inProgress ? '↩ продолжить тренировку' : `${d.exercises.length} упр.` }),
+      ]);
+    })));
     return;
   }
 
-  if (!active || active.dayId !== dayId) startActive(state, dayId);
   const day = state.plan.days.find(d => d.id === dayId);
   if (!day) { ctx.navigate('workout'); return; }
+
+  // Восстанавливаем незавершённую тренировку этого дня либо начинаем новую.
+  active = state.activeWorkout;
+  if (!matchesDay(active, day) || active.dayId !== dayId) startActive(state, dayId);
+
   const prev = previousSessionForDay(state, dayId);
   const restSec = state.settings.defaultRestSec || 90;
 
@@ -107,6 +124,7 @@ function setRow(ex, entry, set, setIdx, prev, restSec) {
     set.w = wIn.value === '' ? null : parseFloat(wIn.value.replace(',', '.'));
     set.reps = rIn.value === '' ? null : parseInt(rIn.value, 10);
     refreshDot();
+    persist(); // сохраняем введённое (дебаунс), чтобы не потерять при выгрузке страницы
   }
   wIn.addEventListener('input', update);
   rIn.addEventListener('input', update);
@@ -117,6 +135,7 @@ function setRow(ex, entry, set, setIdx, prev, restSec) {
     set.done = !set.done;
     doneBtn.className = 'set-done-btn' + (set.done ? ' on' : '');
     row.classList.toggle('set-done', set.done);
+    persistNow();
     if (set.done) {
       tick();
       if (set.w && set.reps) startRest(restSec); // авто-старт отдыха
@@ -176,10 +195,12 @@ function resetRestBtn() {
 
 function finish(ctx) {
   const state = getState();
+  const aw = state.activeWorkout || active;
+  if (!aw) { ctx.navigate('workout'); return; }
   const session = {
-    id: active.id, dayId: active.dayId, dateISO: active.dateISO,
-    durationSec: Math.round((Date.now() - active.startTs) / 1000),
-    entries: active.entries.map(e => ({ exerciseId: e.exerciseId, sets: e.sets.filter(s => s.done && s.w && s.reps).map(s => ({ w: s.w, reps: s.reps })) })).filter(e => e.sets.length),
+    id: aw.id, dayId: aw.dayId, dateISO: aw.dateISO,
+    durationSec: Math.round((Date.now() - aw.startTs) / 1000),
+    entries: aw.entries.map(e => ({ exerciseId: e.exerciseId, sets: e.sets.filter(s => s.done && s.w && s.reps).map(s => ({ w: s.w, reps: s.reps })) })).filter(e => e.sets.length),
     xp: 0,
   };
   const completed = session.entries.reduce((n, e) => n + e.sets.length, 0);
@@ -187,9 +208,10 @@ function finish(ctx) {
 
   const res = finalizeWorkout(state, session);
   const events = recompute(state);
-  save();
-  stopRest();
+  state.activeWorkout = null; // тренировка завершена — убираем черновик
   active = null;
+  persistNow();
+  stopRest();
 
   toast(`+${res.xp.amount} XP · подходов: ${res.completedSets}${res.greenSets ? ` · 🟢 ${res.greenSets}` : ''}`, 'success');
   const queue = [];
