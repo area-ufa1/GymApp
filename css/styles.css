@@ -162,6 +162,25 @@ h3 { margin: 0; }
 .set-x { color: var(--muted); }
 .cmp-dot { width: 20px; text-align: center; font-size: 13px; }
 .set-prev { color: var(--muted); font-size: 11px; margin-left: auto; }
+.wk-hud { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }
+.hud-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; margin-bottom: 6px; }
+.hud-session b { color: var(--accent); font-size: 17px; }
+.hud-level { color: var(--muted); }
+.float-xp { position: fixed; transform: translate(-50%, 0); font-weight: 800; font-size: 15px; pointer-events: none; z-index: 95; transition: transform .85s ease-out, opacity .85s ease-out; }
+.float-xp.go { transform: translate(-50%, -44px); opacity: 0; }
+.float-pos { color: var(--accent); }
+.float-neg { color: var(--red); }
+.sum-body { text-align: center; }
+.sum-xp { font-size: 40px; font-weight: 800; color: var(--accent); margin: 2px 0 12px; }
+.sum-xp span { font-size: 18px; }
+.sum-grid { display: flex; gap: 8px; margin-bottom: 12px; }
+.sum-cell { flex: 1; background: var(--bg2); border-radius: 10px; padding: 10px 6px; }
+.sum-cell b { display: block; font-size: 18px; }
+.sum-cell span { font-size: 11px; color: var(--muted); }
+.sum-sub { font-weight: 700; margin: 8px 0 4px; }
+.sum-pr { font-size: 13px; padding: 3px 0; }
+.sum-break { margin: 10px 0; }
+.sum-event { font-size: 13px; padding: 5px 0; border-top: 1px solid var(--line); }
 .wk-hint { margin: -4px 0 10px; }
 .wk-finish { position: sticky; bottom: 12px; margin-top: 8px; }
 .wk-timer { text-align: right; }
