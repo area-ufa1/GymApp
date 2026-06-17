@@ -2,6 +2,7 @@ import { clear } from './lib/dom.js';
 import { load, getState, save } from './store.js';
 import { recompute } from './game/gamification.js';
 import { scheduleReminder } from './lib/reminders.js';
+import { applyAccent } from './lib/theme.js';
 import * as home from './screens/home.js';
 import * as workout from './screens/workout.js';
 import * as nutrition from './screens/nutrition.js';
@@ -39,6 +40,10 @@ function rerender() {
   const ctx = { navigate, rerender, param };
   SCREENS[route].mod.render(main, ctx);
   renderNav(route);
+  // Микроанимация появления экрана.
+  main.classList.remove('screen-enter');
+  void main.offsetWidth; // рефлоу для перезапуска анимации
+  main.classList.add('screen-enter');
 }
 
 function renderNav(active) {
@@ -56,6 +61,7 @@ window.addEventListener('hashchange', rerender);
 
 function init() {
   load();
+  applyAccent(getState());
   recompute(getState()); // выдать ачивки/квесты, накопившиеся между сессиями
   save();
   if (!location.hash) location.hash = '#home';

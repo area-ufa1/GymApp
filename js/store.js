@@ -23,6 +23,7 @@ export function defaultState() {
       goalRatio: GOAL_RATIO,
       sound: true,
       haptics: true,
+      accentId: 'violet',
       defaultRestSec: 90,
       reminders: { enabled: false, time: '18:00' },
       nutrition: {

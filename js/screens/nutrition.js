@@ -1,4 +1,4 @@
-import { el, section, bar, toast, celebrate, celebrateQueue, modal } from '../lib/dom.js';
+import { el, section, bar, toast, celebrate, celebrateQueue, modal, undoToast } from '../lib/dom.js';
 import { getState, save } from '../store.js';
 import { uid, todayISO } from '../models.js';
 import { barChart } from '../lib/chart.js';
@@ -48,7 +48,11 @@ export function render(root, ctx) {
       el('div', { class: 'meal-macros', text: `${e.grams ? e.grams + ' г · ' : ''}Б ${e.protein} · Ж ${e.fat} · У ${e.carbs}` }),
     ]),
     el('div', { class: 'meal-kcal', html: `<b>${e.kcal}</b> ккал` }),
-    el('button', { class: 'icon-btn', text: '✕', onClick: () => { state.nutritionLog = state.nutritionLog.filter(x => x.id !== e.id); afterChange(state, ctx); } }),
+    el('button', { class: 'icon-btn', text: '✕', onClick: () => {
+      const idx = state.nutritionLog.indexOf(e);
+      state.nutritionLog.splice(idx, 1); afterChange(state, ctx);
+      undoToast(`Удалено: ${e.name}`, () => { state.nutritionLog.splice(idx, 0, e); afterChange(state, ctx); });
+    } }),
   ])) : [el('p', { class: 'muted', text: 'Пока ничего не добавлено сегодня.' })]));
 
   // --- График калорий за неделю ---
@@ -63,7 +67,11 @@ export function render(root, ctx) {
         el('div', { class: 'food-macros', text: `${f.per100.kcal} ккал · Б ${f.per100.protein} · Ж ${f.per100.fat} · У ${f.per100.carbs}` }),
       ]),
       el('button', { class: 'icon-btn', text: '✎', onClick: () => foodModal(state, ctx, f) }),
-      el('button', { class: 'icon-btn', text: '✕', onClick: () => { state.foods = state.foods.filter(x => x.id !== f.id); save(); ctx.rerender(); } }),
+      el('button', { class: 'icon-btn', text: '✕', onClick: () => {
+        const idx = state.foods.indexOf(f);
+        state.foods.splice(idx, 1); save(); ctx.rerender();
+        undoToast(`Продукт «${f.name}» удалён`, () => { state.foods.splice(idx, 0, f); save(); ctx.rerender(); });
+      } }),
     ])) : [el('p', { class: 'muted', text: 'Добавь часто используемые продукты для быстрого ввода.' })]),
     el('button', { class: 'btn btn-ghost btn-block', text: '+ Добавить продукт', onClick: () => foodModal(state, ctx, null) }),
   ]));

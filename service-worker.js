@@ -1,7 +1,7 @@
 // Офлайн-кэш оболочки приложения.
 // Стратегия: network-first для своих ресурсов (свежий код при наличии сети),
 // кэш — офлайн-фоллбэк. Так обновления подхватываются сразу, а не «залипают».
-const CACHE = 'gymquest-v5';
+const CACHE = 'gymquest-v6';
 const ASSETS = [
   './',
   './index.html',
@@ -19,6 +19,7 @@ const ASSETS = [
   './js/lib/effects.js',
   './js/lib/reminders.js',
   './js/lib/nutrition.js',
+  './js/lib/theme.js',
   './js/game/gamification.js',
   './js/data/seedPlan.js',
   './js/data/strengthLevels.js',
