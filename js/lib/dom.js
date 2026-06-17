@@ -83,6 +83,32 @@ export function floatXp(targetEl, text, kind = 'pos') {
   setTimeout(() => node.remove(), 900);
 }
 
+// Тост с действием «Отменить». onUndo вызывается при нажатии. Возвращает функцию закрытия.
+export function undoToast(text, onUndo, timeout = 5000) {
+  if (!toastHost) { toastHost = el('div', { class: 'toast-host' }); document.body.appendChild(toastHost); }
+  let timer = null;
+  const dismiss = () => { clearTimeout(timer); t.classList.remove('show'); setTimeout(() => t.remove(), 300); };
+  const btn = el('button', { class: 'toast-undo', text: 'Отменить', onClick: () => { dismiss(); onUndo && onUndo(); } });
+  const t = el('div', { class: 'toast toast-undo-host' }, [el('span', { html: text }), btn]);
+  toastHost.appendChild(t);
+  requestAnimationFrame(() => t.classList.add('show'));
+  timer = setTimeout(dismiss, timeout);
+  return dismiss;
+}
+
+// Диалог подтверждения. Возвращает Promise<boolean>.
+export function confirmModal({ title = 'Подтвердите', message = '', okText = 'Удалить', cancelText = 'Отмена', danger = true } = {}) {
+  return new Promise(resolve => {
+    let settled = false;
+    const done = (val) => { if (settled) return; settled = true; close(); resolve(val); };
+    const body = el('div', { class: 'confirm-body' }, [el('p', { text: message })]);
+    const close = modal(title, body, [
+      el('button', { class: 'btn btn-ghost', text: cancelText, onClick: () => done(false) }),
+      el('button', { class: `btn ${danger ? 'btn-danger' : 'btn-primary'}`, text: okText, onClick: () => done(true) }),
+    ]);
+  });
+}
+
 // Модальное окно с произвольным содержимым. Возвращает функцию закрытия.
 export function modal(title, contentNode, actions = []) {
   const box = el('div', { class: 'modal' }, [

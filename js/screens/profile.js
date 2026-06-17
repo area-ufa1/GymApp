@@ -1,4 +1,4 @@
-import { el, section, bar, toast, modal } from '../lib/dom.js';
+import { el, section, bar, toast, modal, confirmModal, undoToast } from '../lib/dom.js';
 import { getState, save, exportJSON, importJSON, resetAll } from '../store.js';
 import { uid, MUSCLE_GROUPS, inferMuscle } from '../models.js';
 import { aggregate, strengthTitle, recompute } from '../game/gamification.js';
@@ -8,6 +8,7 @@ import { records } from '../lib/analytics.js';
 import { fmtDate } from '../lib/calc.js';
 import { fanfare } from '../lib/effects.js';
 import { requestReminderPermission, scheduleReminder, notifySupported } from '../lib/reminders.js';
+import { ACCENTS, applyAccent } from '../lib/theme.js';
 
 const TON_MILESTONES = [
   { t: 1000, icon: '🏋️', name: '1 тонна' },
@@ -91,7 +92,11 @@ export function render(root, ctx) {
       el('div', { class: 'photo-cell' }, [
         el('img', { src: p.data, alt: p.dateISO }),
         el('div', { class: 'photo-date', text: p.dateISO }),
-        el('button', { class: 'photo-del', text: '✕', onClick: () => { state.game.photos.splice(photos.length - 1 - i, 1); save(); ctx.rerender(); } }),
+        el('button', { class: 'photo-del', text: '✕', onClick: () => {
+          const idx = photos.length - 1 - i;
+          const [removed] = state.game.photos.splice(idx, 1); save(); ctx.rerender();
+          undoToast('Фото удалено', () => { state.game.photos.splice(idx, 0, removed); save(); ctx.rerender(); });
+        } }),
       ])) : [el('p', { class: 'muted', text: 'Добавь фото, чтобы отслеживать визуальный прогресс.' })]),
     el('button', { class: 'btn btn-ghost btn-block', text: '📷 Добавить фото', onClick: () => fileIn.click() }),
     fileIn,
@@ -108,8 +113,12 @@ export function render(root, ctx) {
     el('div', { class: 'data-btns' }, [
       el('button', { class: 'btn btn-ghost', text: '⬇ Экспорт', onClick: exportData }),
       el('button', { class: 'btn btn-ghost', text: '⬆ Импорт', onClick: () => importData(ctx) }),
-      el('button', { class: 'btn btn-danger', text: '🗑 Сброс', onClick: () => {
-        if (confirm('Удалить все данные и начать заново?')) { resetAll(); toast('Данные сброшены', 'info'); ctx.rerender(); }
+      el('button', { class: 'btn btn-danger', text: '🗑 Сброс', onClick: async () => {
+        const backup = exportJSON();
+        const ok = await confirmModal({ title: 'Сбросить всё?', message: 'Удалить все данные и начать заново? Действие можно отменить сразу после.', okText: 'Сбросить' });
+        if (!ok) return;
+        resetAll(); ctx.rerender();
+        undoToast('Данные сброшены', () => { importJSON(backup); applyAccent(getState()); ctx.rerender(); });
       } }),
     ]),
     el('p', { class: 'muted small', text: 'Данные хранятся только в этом браузере. Делай экспорт для бэкапа и переноса на другое устройство.' }),
@@ -135,7 +144,15 @@ function settingsSection(state, ctx) {
   const timeIn = el('input', { type: 'time', class: 'set-input', value: (s.reminders && s.reminders.time) || '18:00' });
   timeIn.addEventListener('change', () => { s.reminders.time = timeIn.value; save(); scheduleReminder(); });
 
+  const swatches = el('div', { class: 'accent-row' }, ACCENTS.map(a =>
+    el('button', {
+      class: 'swatch' + ((s.accentId || 'violet') === a.id ? ' on' : ''),
+      title: a.name, style: `background:${a.pri}`,
+      onClick: () => { s.accentId = a.id; save(); applyAccent(state); ctx.rerender(); },
+    })));
+
   return section('Настройки', [
+    el('div', { class: 'toggle-row' }, [el('span', { text: '🎨 Акцентный цвет' }), swatches]),
     toggleRow('🔊 Звук', s.sound !== false, v => { s.sound = v; save(); }),
     toggleRow('📳 Вибрация', s.haptics !== false, v => { s.haptics = v; save(); }),
     el('label', { class: 'toggle-row' }, [el('span', { text: '⏱ Отдых по умолчанию' }), restSel]),
@@ -158,7 +175,11 @@ function planEditor(state, ctx) {
       el('span', { class: 'pe-ex-name', text: ex.name }),
       el('span', { class: 'pe-ex-meta', text: `${ex.sets}×${ex.repsMin}–${ex.repsMax}` }),
       el('button', { class: 'icon-btn', text: '✎', onClick: () => editExercise(state, day, ex, ctx) }),
-      el('button', { class: 'icon-btn', text: '✕', onClick: () => { day.exercises = day.exercises.filter(e => e !== ex); save(); ctx.rerender(); } }),
+      el('button', { class: 'icon-btn', text: '✕', onClick: () => {
+        const idx = day.exercises.indexOf(ex);
+        day.exercises.splice(idx, 1); save(); ctx.rerender();
+        undoToast(`Удалено: ${ex.name}`, () => { day.exercises.splice(idx, 0, ex); save(); ctx.rerender(); });
+      } }),
     ]));
     return el('details', { class: 'pe-day' }, [
       el('summary', {}, [el('b', { text: day.name }), el('span', { class: 'muted', text: ` · ${day.focus}` })]),
@@ -166,7 +187,11 @@ function planEditor(state, ctx) {
       el('button', { class: 'btn btn-ghost btn-sm', text: '+ Упражнение', onClick: () => editExercise(state, day, null, ctx) }),
       el('div', { class: 'pe-day-actions' }, [
         el('button', { class: 'btn btn-ghost btn-sm', text: '✎ День', onClick: () => editDay(state, day, ctx) }),
-        el('button', { class: 'btn btn-danger btn-sm', text: '✕ Удалить день', onClick: () => { if (confirm('Удалить день?')) { state.plan.days = state.plan.days.filter(d => d !== day); save(); ctx.rerender(); } } }),
+        el('button', { class: 'btn btn-danger btn-sm', text: '✕ Удалить день', onClick: () => {
+          const idx = state.plan.days.indexOf(day);
+          state.plan.days.splice(idx, 1); save(); ctx.rerender();
+          undoToast(`День «${day.name}» удалён`, () => { state.plan.days.splice(idx, 0, day); save(); ctx.rerender(); });
+        } }),
       ]),
     ]);
   });
