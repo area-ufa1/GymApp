@@ -39,15 +39,17 @@ export function render(root, ctx) {
     ]),
   ]);
 
-  // --- Тренировка дня ---
-  const day = nextDay(state);
-  const todayCard = section('Тренировка дня', [
+  // --- Тренировка дня (с приоритетом незавершённой) ---
+  const aw = state.activeWorkout;
+  const awDay = aw && state.plan.days.find(d => d.id === aw.dayId);
+  const day = awDay || nextDay(state);
+  const todayCard = section(awDay ? 'Незавершённая тренировка' : 'Тренировка дня', [
     day ? el('div', { class: 'today' }, [
       el('div', {}, [
         el('div', { class: 'today-name', text: day.name }),
         el('div', { class: 'today-focus', text: day.focus }),
       ]),
-      el('button', { class: 'btn btn-primary', text: '▶ Начать', onClick: () => ctx.navigate(`workout/${day.id}`) }),
+      el('button', { class: 'btn btn-primary', text: awDay ? '↩ Продолжить' : '▶ Начать', onClick: () => ctx.navigate(`workout/${day.id}`) }),
     ]) : el('p', { class: 'muted', text: 'Добавь день в плане.' }),
   ]);
 

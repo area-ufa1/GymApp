@@ -140,6 +140,8 @@ h3 { margin: 0; }
 .day-pick-name { font-size: 17px; font-weight: 800; }
 .day-pick-focus { color: var(--muted); font-size: 13px; margin: 3px 0; }
 .day-pick-meta { color: var(--accent); font-size: 12px; }
+.day-pick-active { border-color: var(--pri); box-shadow: inset 0 0 0 1px var(--pri); }
+.day-pick-active .day-pick-meta { color: var(--pri2); font-weight: 700; }
 
 /* --- Workout --- */
 .wk-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
