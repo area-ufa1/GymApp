@@ -207,24 +207,25 @@ export function compareSet(prevSession, exerciseId, setIdx, set) {
   return 'yellow';
 }
 
-// ---- Завершение тренировки: пишет сессию, начисляет XP, обновляет серию ----
-export function finalizeWorkout(state, session) {
-  const prev = previousSessionForDay(state, session.dayId);
-  let completedSets = 0, greenSets = 0;
-  for (const e of session.entries) {
-    e.sets.forEach((s, i) => {
-      if (s && s.w && s.reps) {
-        completedSets++;
-        if (compareSet(prev, e.exerciseId, i, s) === 'green') greenSets++;
-      }
-    });
-  }
-  const xpAmount = 50 + completedSets * 8 + greenSets * 20;
-  session.xp = xpAmount;
+// ---- XP за отдельный подход (начисляется сразу при отметке ✓) ----
+export const WORKOUT_COMPLETION_XP = 50;
+
+export function setXpBreakdown(set, { isGreen = false, isPr = false } = {}) {
+  const base = 5;
+  const volume = Math.max(0, Math.min(15, Math.round(((set.w || 0) * (set.reps || 0)) / 150)));
+  const green = isGreen ? 10 : 0;
+  const pr = isPr ? 25 : 0;
+  return { base, volume, green, pr, total: base + volume + green + pr };
+}
+
+// ---- Завершение тренировки: пишет сессию, начисляет бонус за завершение ----
+// XP за подходы уже начислены по ходу тренировки; setXpTotal — их сумма (для истории).
+export function finalizeWorkout(state, session, setXpTotal = 0) {
+  session.xp = (setXpTotal || 0) + WORKOUT_COMPLETION_XP;
   state.sessions.push(session);
-  // Серия теперь вычисляется из истории в aggregate() — отдельный апдейт не нужен.
-  const xpRes = awardXp(state, xpAmount, 'Тренировка завершена');
-  return { completedSets, greenSets, xp: xpRes, breakdown: { base: 50, perSet: completedSets * 8, green: greenSets * 20 } };
+  // Серия вычисляется из истории в aggregate() — отдельный апдейт не нужен.
+  const xpRes = awardXp(state, WORKOUT_COMPLETION_XP, 'Тренировка завершена');
+  return { xp: xpRes, completionXp: WORKOUT_COMPLETION_XP, setXpTotal };
 }
 
 // ---- Боссы-рубежи ----

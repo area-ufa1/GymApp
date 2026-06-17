@@ -72,6 +72,17 @@ export function celebrateQueue(items) {
   next();
 }
 
+// Всплывающее «+N XP» рядом с элементом (анимация вверх и затухание).
+export function floatXp(targetEl, text, kind = 'pos') {
+  const r = targetEl.getBoundingClientRect();
+  const node = el('div', { class: `float-xp float-${kind}`, text });
+  node.style.left = `${r.left + r.width / 2}px`;
+  node.style.top = `${r.top}px`;
+  document.body.appendChild(node);
+  requestAnimationFrame(() => node.classList.add('go'));
+  setTimeout(() => node.remove(), 900);
+}
+
 // Модальное окно с произвольным содержимым. Возвращает функцию закрытия.
 export function modal(title, contentNode, actions = []) {
   const box = el('div', { class: 'modal' }, [

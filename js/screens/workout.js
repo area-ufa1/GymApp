@@ -1,11 +1,11 @@
-import { el, section, toast, celebrate, modal } from '../lib/dom.js';
+import { el, section, toast, celebrate, modal, floatXp, bar } from '../lib/dom.js';
 import { getState, save } from '../store.js';
 import { uid, todayISO } from '../models.js';
-import { formatSet, fmtDate } from '../lib/calc.js';
+import { formatSet, fmtDate, epley1RM, round1 } from '../lib/calc.js';
 import { lineChart } from '../lib/chart.js';
-import { finalizeWorkout, recompute, previousSessionForDay, compareSet } from '../game/gamification.js';
+import { finalizeWorkout, recompute, previousSessionForDay, compareSet, setXpBreakdown, awardXp, levelProgress } from '../game/gamification.js';
 import { suggestProgression, exerciseHistory } from '../lib/analytics.js';
-import { restEndCue, tick } from '../lib/effects.js';
+import { restEndCue, tick, confetti, fanfare } from '../lib/effects.js';
 
 let active = null;      // ссылка на state.activeWorkout (он же — источник истины)
 let restTimer = null;   // {endTs, intervalId}
@@ -84,7 +84,10 @@ export function render(root, ctx) {
     ]),
   ]);
 
-  const hint = el('div', { class: 'wk-hint muted small', text: 'Отмечай выполненные подходы кнопкой ✓ — только они засчитываются.' });
+  const hud = el('div', { class: 'wk-hud', id: 'wk-hud' });
+  renderHud(hud, state);
+
+  const hint = el('div', { class: 'wk-hint muted small', text: 'Отмечай выполненные подходы кнопкой ✓ — XP начисляется сразу.' });
 
   const list = el('div', { class: 'wk-list' }, day.exercises.map((ex, exIdx) => {
     const entry = active.entries[exIdx];
@@ -104,7 +107,42 @@ export function render(root, ctx) {
 
   const finishBtn = el('button', { class: 'btn btn-primary btn-block', text: '✅ Завершить тренировку', onClick: () => finish(ctx) });
 
-  root.append(header, hint, list, el('div', { class: 'wk-finish' }, [finishBtn]));
+  root.append(header, hud, hint, list, el('div', { class: 'wk-finish' }, [finishBtn]));
+}
+
+// Сумма XP, начисленного за подходы текущей тренировки.
+function sessionXp(aw) {
+  let t = 0;
+  for (const e of (aw && aw.entries) || []) for (const s of e.sets) t += s.xpAwarded || 0;
+  return t;
+}
+
+// Лучший est-1ПМ по упражнению (история + уже отмеченные подходы текущей тренировки).
+function bestOneRm(state, aw, exerciseId, excludeSet) {
+  let best = 0;
+  for (const h of exerciseHistory(state, exerciseId)) best = Math.max(best, h.oneRm);
+  const e = (aw.entries || []).find(x => x.exerciseId === exerciseId);
+  if (e) for (const s of e.sets) {
+    if (s !== excludeSet && s.done && s.w && s.reps) best = Math.max(best, epley1RM(s.w, s.reps));
+  }
+  return best;
+}
+
+function renderHud(hud, state) {
+  const sx = sessionXp(state.activeWorkout);
+  const lp = levelProgress(state.game.totalXp);
+  hud.innerHTML = '';
+  hud.append(
+    el('div', { class: 'hud-top' }, [
+      el('span', { class: 'hud-session', html: `Сессия: <b>+${sx}</b> XP` }),
+      el('span', { class: 'hud-level', text: `Ур. ${lp.level}` }),
+    ]),
+    bar(lp.pct),
+  );
+}
+function updateHud(state) {
+  const hud = document.getElementById('wk-hud');
+  if (hud) renderHud(hud, state);
 }
 
 function setRow(ex, entry, set, setIdx, prev, restSec) {
@@ -132,13 +170,38 @@ function setRow(ex, entry, set, setIdx, prev, restSec) {
 
   const doneBtn = el('button', { class: 'set-done-btn' + (set.done ? ' on' : ''), text: set.done ? '✓' : '○' });
   doneBtn.addEventListener('click', () => {
-    set.done = !set.done;
-    doneBtn.className = 'set-done-btn' + (set.done ? ' on' : '');
-    row.classList.toggle('set-done', set.done);
-    persistNow();
-    if (set.done) {
+    const state = getState();
+    if (!set.done) {
+      // Отметить выполненным — только с весом и повторами.
+      if (!(set.w && set.reps)) { toast('Введите вес и повторы', 'warn'); return; }
+      set.done = true;
+      doneBtn.className = 'set-done-btn on';
+      row.classList.add('set-done');
+
+      const isGreen = compareSet(prev, ex.id, setIdx, set) === 'green';
+      const isPr = epley1RM(set.w, set.reps) > bestOneRm(state, active, ex.id, set) + 0.5;
+      const bd = setXpBreakdown(set, { isGreen, isPr });
+      set.xpAwarded = bd.total;
+      const res = awardXp(state, bd.total, 'Подход');
+      floatXp(doneBtn, `+${bd.total} XP`, 'pos');
+      if (isPr) toast(`🏆 Рекорд в «${ex.name}»!`, 'success');
       tick();
-      if (set.w && set.reps) startRest(restSec); // авто-старт отдыха
+      startRest(restSec);
+      updateHud(state);
+      persistNow();
+      if (res.leveledUp) celebrate('⭐', `Уровень ${res.newLevel}!`, 'Новый уровень достигнут');
+    } else {
+      // Снять отметку — откатить начисленный за подход XP.
+      set.done = false;
+      doneBtn.className = 'set-done-btn';
+      row.classList.remove('set-done');
+      if (set.xpAwarded) {
+        awardXp(state, -set.xpAwarded, 'Откат подхода');
+        floatXp(doneBtn, `−${set.xpAwarded} XP`, 'neg');
+        set.xpAwarded = 0;
+        updateHud(state);
+      }
+      persistNow();
     }
   });
 
@@ -197,34 +260,75 @@ function finish(ctx) {
   const state = getState();
   const aw = state.activeWorkout || active;
   if (!aw) { ctx.navigate('workout'); return; }
+  const day = state.plan.days.find(d => d.id === aw.dayId);
+  const prev = previousSessionForDay(state, aw.dayId);
+
+  // Сводка по выполненным подходам (рекорды считаем относительно истории до этой тренировки).
+  let completedSets = 0, greenCount = 0, tonnage = 0;
+  const prs = [];
+  for (const e of aw.entries) {
+    let pre = 0;
+    for (const h of exerciseHistory(state, e.exerciseId)) pre = Math.max(pre, h.oneRm);
+    let sessionBest = 0;
+    e.sets.forEach((s, i) => {
+      if (s.done && s.w && s.reps) {
+        completedSets++; tonnage += s.w * s.reps;
+        if (compareSet(prev, e.exerciseId, i, s) === 'green') greenCount++;
+        sessionBest = Math.max(sessionBest, epley1RM(s.w, s.reps));
+      }
+    });
+    if (sessionBest > pre + 0.5) {
+      const ex = (day.exercises || []).find(x => x.id === e.exerciseId);
+      prs.push({ name: ex ? ex.name : 'Упражнение', oneRm: round1(sessionBest) });
+    }
+  }
+  if (completedSets === 0) { toast('Отметь выполненные подходы кнопкой ✓', 'warn'); return; }
+
+  const setXpTotal = sessionXp(aw);
   const session = {
     id: aw.id, dayId: aw.dayId, dateISO: aw.dateISO,
     durationSec: Math.round((Date.now() - aw.startTs) / 1000),
     entries: aw.entries.map(e => ({ exerciseId: e.exerciseId, sets: e.sets.filter(s => s.done && s.w && s.reps).map(s => ({ w: s.w, reps: s.reps })) })).filter(e => e.sets.length),
     xp: 0,
   };
-  const completed = session.entries.reduce((n, e) => n + e.sets.length, 0);
-  if (completed === 0) { toast('Отметь выполненные подходы кнопкой ✓', 'warn'); return; }
-
-  const res = finalizeWorkout(state, session);
+  const res = finalizeWorkout(state, session, setXpTotal);
   const events = recompute(state);
   state.activeWorkout = null; // тренировка завершена — убираем черновик
   active = null;
   persistNow();
   stopRest();
 
-  toast(`+${res.xp.amount} XP · подходов: ${res.completedSets}${res.greenSets ? ` · 🟢 ${res.greenSets}` : ''}`, 'success');
-  const queue = [];
-  if (res.xp.leveledUp) queue.push(['⭐', `Уровень ${res.xp.newLevel}!`, 'Новый уровень достигнут']);
-  for (const a of events.newAchievements) queue.push([a.icon, a.title, 'Ачивка разблокирована']);
-  for (const q of events.newQuests) queue.push(['🎯', 'Квест выполнен', `${q.text} (+${q.xp} XP)`]);
-  playQueue(queue);
-  ctx.navigate('home');
+  ctx.navigate('home'); // под итоговым экраном будет главная
+  showSummary({
+    dayName: day ? day.name : 'Тренировка',
+    totalXp: setXpTotal + res.completionXp,
+    setXpTotal, completionXp: res.completionXp,
+    completedSets, greenCount, tonnage: Math.round(tonnage), prs,
+    leveledUp: res.xp.leveledUp, newLevel: res.xp.newLevel,
+    achievements: events.newAchievements, quests: events.newQuests,
+  });
 }
 
-function playQueue(queue) {
-  if (!queue.length) return;
-  let i = 0;
-  const next = () => { if (i < queue.length) { const [e, t, s] = queue[i++]; celebrate(e, t, s); setTimeout(next, 2300); } };
-  next();
+function showSummary(s) {
+  const lines = [];
+  lines.push(el('div', { class: 'sum-xp', html: `+${s.totalXp} <span>XP</span>` }));
+  lines.push(el('div', { class: 'sum-grid' }, [
+    el('div', { class: 'sum-cell' }, [el('b', { text: String(s.completedSets) }), el('span', { text: 'подходов' })]),
+    el('div', { class: 'sum-cell' }, [el('b', { text: `${s.tonnage}` }), el('span', { text: 'кг объём' })]),
+    el('div', { class: 'sum-cell' }, [el('b', { text: `🟢 ${s.greenCount}` }), el('span', { text: 'прогресс' })]),
+  ]));
+  if (s.prs.length) lines.push(el('div', { class: 'sum-prs' }, [
+    el('div', { class: 'sum-sub', text: '🏆 Личные рекорды' }),
+    ...s.prs.map(p => el('div', { class: 'sum-pr', html: `${p.name} — <b>${p.oneRm} кг</b>` })),
+  ]));
+  lines.push(el('div', { class: 'sum-break muted small', text: `За подходы +${s.setXpTotal} · за завершение +${s.completionXp}` }));
+  if (s.leveledUp) lines.push(el('div', { class: 'sum-event', text: `⭐ Новый уровень ${s.newLevel}!` }));
+  for (const a of s.achievements) lines.push(el('div', { class: 'sum-event', text: `${a.icon} Ачивка: ${a.title}` }));
+  for (const q of s.quests) lines.push(el('div', { class: 'sum-event', text: `🎯 Квест: ${q.text} (+${q.xp} XP)` }));
+
+  const close = modal(`Готово — ${s.dayName}`, el('div', { class: 'sum-body' }, lines), [
+    el('button', { class: 'btn btn-primary', text: 'Отлично!', onClick: () => close() }),
+  ]);
+  confetti();
+  fanfare();
 }
