@@ -3,6 +3,16 @@
 import { epley1RM, round1, setTonnage } from './calc.js';
 import { inferMuscle } from '../models.js';
 
+// Рекомендуемый отдых для упражнения (сек). Ручной override ex.restSec, иначе
+// по нижней границе диапазона повторов: тяжёлая база — дольше, многоповторка — меньше.
+export function restForExercise(ex) {
+  if (ex && ex.restSec != null && ex.restSec !== '') return Math.max(10, +ex.restSec);
+  const r = (ex && (ex.repsMin || ex.repsMax)) || 10;
+  if (r <= 6) return 180;
+  if (r <= 12) return 120;
+  return 60;
+}
+
 // Карта exerciseId -> {name, muscle} по текущему плану.
 export function exerciseIndex(state) {
   const map = new Map();
