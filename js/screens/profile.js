@@ -155,7 +155,7 @@ function settingsSection(state, ctx) {
     el('div', { class: 'toggle-row' }, [el('span', { text: '🎨 Акцентный цвет' }), swatches]),
     toggleRow('🔊 Звук', s.sound !== false, v => { s.sound = v; save(); }),
     toggleRow('📳 Вибрация', s.haptics !== false, v => { s.haptics = v; save(); }),
-    el('label', { class: 'toggle-row' }, [el('span', { text: '⏱ Отдых по умолчанию' }), restSel]),
+    el('label', { class: 'toggle-row' }, [el('span', { text: '⏱ Ручной таймер отдыха' }), restSel]),
     toggleRow('🔔 Напоминания о тренировке', !!(s.reminders && s.reminders.enabled), async v => {
       if (v) {
         const perm = await requestReminderPermission();
@@ -211,6 +211,7 @@ function editExercise(state, day, ex, ctx) {
   const rmax = el('input', { type: 'number', class: 'set-input', value: ex ? ex.repsMax : 12 });
   const muscle = el('select', { class: 'set-input wide' }, MUSCLE_GROUPS.map(g =>
     el('option', { value: g, text: g, selected: (ex ? (ex.muscle || inferMuscle(ex.name)) : 'Прочее') === g })));
+  const rest = el('input', { type: 'number', class: 'set-input wide', placeholder: 'авто', value: ex && ex.restSec != null ? ex.restSec : '' });
   const body = el('div', { class: 'edit-form' }, [
     el('label', { text: 'Упражнение' }), name,
     el('label', { text: 'Группа мышц' }), muscle,
@@ -219,11 +220,13 @@ function editExercise(state, day, ex, ctx) {
       el('label', {}, [el('span', { text: 'Повт. от' }), rmin]),
       el('label', {}, [el('span', { text: 'Повт. до' }), rmax]),
     ]),
+    el('label', { text: 'Отдых, сек (пусто = авто по повторам)' }), rest,
   ]);
   const close = modal(ex ? 'Изменить упражнение' : 'Новое упражнение', body, [
     el('button', { class: 'btn btn-primary', text: 'Сохранить', onClick: () => {
       if (!name.value.trim()) { toast('Введите название', 'warn'); return; }
-      const data = { name: name.value.trim(), muscle: muscle.value, sets: +sets.value || 1, repsMin: +rmin.value || 1, repsMax: +rmax.value || 1 };
+      const restVal = rest.value === '' ? null : Math.max(10, +rest.value || 0);
+      const data = { name: name.value.trim(), muscle: muscle.value, sets: +sets.value || 1, repsMin: +rmin.value || 1, repsMax: +rmax.value || 1, restSec: restVal };
       if (ex) Object.assign(ex, data); else day.exercises.push({ id: uid('ex'), ...data });
       save(); close(); ctx.rerender();
     } }),

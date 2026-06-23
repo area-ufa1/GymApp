@@ -4,7 +4,7 @@ import { uid, todayISO } from '../models.js';
 import { formatSet, fmtDate, epley1RM, round1 } from '../lib/calc.js';
 import { lineChart } from '../lib/chart.js';
 import { finalizeWorkout, recompute, previousSessionForDay, compareSet, setXpBreakdown, awardXp, levelProgress } from '../game/gamification.js';
-import { suggestProgression, exerciseHistory } from '../lib/analytics.js';
+import { suggestProgression, exerciseHistory, restForExercise } from '../lib/analytics.js';
 import { restEndCue, tick, confetti, fanfare } from '../lib/effects.js';
 
 let active = null;      // ссылка на state.activeWorkout (он же — источник истины)
@@ -92,22 +92,28 @@ export function render(root, ctx) {
   const list = el('div', { class: 'wk-list' }, day.exercises.map((ex, exIdx) => {
     const entry = active.entries[exIdx];
     const sug = entry.suggestion;
+    const exRest = restForExercise(ex);
     return el('div', { class: 'wk-ex' }, [
       el('div', { class: 'wk-ex-head' }, [
         el('button', { class: 'wk-ex-name link', text: ex.name + ' ›', onClick: () => openHistory(state, ex) }),
-        el('div', { class: 'wk-ex-target', text: `${ex.sets}×${ex.repsMin}–${ex.repsMax}` }),
+        el('div', { class: 'wk-ex-target', text: `${ex.sets}×${ex.repsMin}–${ex.repsMax} · ⏱ ${fmtRest(exRest)}` }),
       ]),
       sug ? el('div', { class: 'wk-suggest', html: sug.kind === 'weight'
         ? `🎯 цель: <b>${sug.w} кг</b> × ${sug.reps} (вес +, было ${formatSet(sug.from)})`
         : `🎯 цель: ${sug.w} кг × <b>${sug.reps}</b> повт (было ${formatSet(sug.from)})` }) : null,
       el('div', { class: 'sets' }, entry.sets.map((set, setIdx) =>
-        setRow(ex, entry, set, setIdx, prev, restSec))),
+        setRow(ex, entry, set, setIdx, prev, exRest))),
     ]);
   }));
 
   const finishBtn = el('button', { class: 'btn btn-primary btn-block', text: '✅ Завершить тренировку', onClick: () => finish(ctx) });
 
   root.append(header, hud, hint, list, el('div', { class: 'wk-finish' }, [finishBtn]));
+}
+
+function fmtRest(sec) {
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 // Сумма XP, начисленного за подходы текущей тренировки.
