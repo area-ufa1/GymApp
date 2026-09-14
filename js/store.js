@@ -1,6 +1,6 @@
 // Единое хранилище состояния поверх localStorage.
 import { STORAGE_KEY, GOAL_RATIO, uid, todayISO, inferMuscle } from './models.js';
-import { SEED_PLAN, SEED_STRENGTH, SEED_MEASUREMENT } from './data/seedPlan.js';
+import { SEED_PLAN, SEED_STRENGTH, SEED_MEASUREMENT, DEFAULT_ACCESSORY } from './data/seedPlan.js';
 
 function buildPlan() {
   return {
@@ -33,6 +33,7 @@ export function defaultState() {
     },
     plan: buildPlan(),
     sessions: [],
+    activeWorkout: null, // незавершённая тренировка: {id, dayId, dateISO, startTs, variant, comeback, entries}
     strength: {
       // лог силовых: каждая запись — лучший подход по движению на дату.
       // seed:true — стартовые значения, не считаются «действием этой недели» для квестов.
@@ -102,11 +103,16 @@ function migrate(s) {
   if (!Array.isArray(merged.foods)) merged.foods = [];
   if (!Array.isArray(merged.nutritionLog)) merged.nutritionLog = [];
   if (!Array.isArray(merged.game.nutritionXpDates)) merged.game.nutritionXpDates = [];
+  if (merged.activeWorkout === undefined) merged.activeWorkout = null;
   // Проставляем группу мышц упражнениям, где её ещё нет.
+  // Поле isAccessory опциональное: у старых бэкапов его нет, подставляем значение
+  // по умолчанию (для дня 1 — два дополнительных упражнения из стартового плана).
   if (merged.plan && Array.isArray(merged.plan.days)) {
     for (const d of merged.plan.days) {
+      const defaults = DEFAULT_ACCESSORY[d.id] || [];
       for (const ex of d.exercises || []) {
         if (!ex.muscle) ex.muscle = inferMuscle(ex.name);
+        if (ex.isAccessory === undefined) ex.isAccessory = defaults.includes(ex.name);
       }
     }
   }

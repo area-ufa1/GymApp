@@ -383,3 +383,47 @@ h3 { margin: 0; }
 .target-preview { background: var(--bg2); border-radius: 10px; padding: 10px; font-size: 13px; color: var(--muted); margin-top: 4px; }
 .target-preview b { color: var(--accent); font-size: 16px; }
 .nutri-setup summary { cursor: pointer; padding: 4px 0; }
+
+/* --- Режим возвращения и версии тренировки --- */
+.wk-banner {
+  background: linear-gradient(135deg, rgba(245,196,81,0.16), rgba(245,196,81,0.06));
+  border: 1px solid rgba(245,196,81,0.35);
+  color: var(--gold);
+  border-radius: 12px;
+  padding: 9px 11px;
+  font-size: 13px;
+  line-height: 1.35;
+  margin-bottom: 10px;
+}
+.wk-banner.soft { color: var(--accent); border-color: rgba(0,210,168,0.35); background: rgba(0,210,168,0.08); }
+
+.wk-variant { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.variant-chip {
+  border: 1px solid var(--line); background: var(--card2); color: var(--muted);
+  border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.variant-chip.on { border-color: var(--pri2); background: rgba(108,92,231,0.22); color: var(--text); }
+
+.variant-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.variant-card {
+  width: 100%; text-align: left; cursor: pointer;
+  background: var(--card2); border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px 12px; color: var(--text); font: inherit;
+}
+.variant-card.on { border-color: var(--pri2); box-shadow: 0 0 0 1px var(--pri2) inset; }
+.variant-top { display: flex; align-items: center; gap: 8px; }
+.variant-title { font-size: 15px; font-weight: 800; }
+.variant-tag {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 800;
+  color: var(--gold); border: 1px solid rgba(245,196,81,0.5); border-radius: 999px; padding: 2px 6px;
+}
+.variant-desc { color: var(--muted); font-size: 12px; margin: 2px 0; }
+.variant-meta { color: var(--accent); font-size: 12px; }
+
+.target-was { color: var(--muted); }
+.pe-ex-acc .pe-ex-name { color: var(--muted); }
+.pe-tag {
+  font-size: 10px; font-weight: 800; color: var(--gold);
+  border: 1px solid rgba(245,196,81,0.4); border-radius: 999px; padding: 1px 5px;
+}
+.wk-finish { display: flex; flex-direction: column; gap: 6px; }

@@ -2,6 +2,7 @@ import { el, section, bar, stat } from '../lib/dom.js';
 import { getState } from '../store.js';
 import { weekOrdinal } from '../models.js';
 import { aggregate, strengthTitle, getQuests, bosses } from '../game/gamification.js';
+import { comebackState, comebackNote } from '../lib/comeback.js';
 
 export function nextDay(state) {
   const days = state.plan.days;
@@ -40,15 +41,19 @@ export function render(root, ctx) {
   ]);
 
   // --- Тренировка дня ---
-  const day = nextDay(state);
-  const todayCard = section('Тренировка дня', [
+  const aw = state.activeWorkout;
+  const awDay = aw && state.plan.days.find(d => d.id === aw.dayId);
+  const day = awDay || nextDay(state);
+  const cb = comebackState(state);
+  const todayCard = section(awDay ? 'Незавершённая тренировка' : 'Тренировка дня', [
     day ? el('div', { class: 'today' }, [
       el('div', {}, [
         el('div', { class: 'today-name', text: day.name }),
-        el('div', { class: 'today-focus', text: day.focus }),
+        el('div', { class: 'today-focus', text: awDay ? `начата ${aw.dateISO}` : day.focus }),
       ]),
-      el('button', { class: 'btn btn-primary', text: '▶ Начать', onClick: () => ctx.navigate(`workout/${day.id}`) }),
+      el('button', { class: 'btn btn-primary', text: awDay ? '↩ Продолжить' : '▶ Начать', onClick: () => ctx.navigate(`workout/${day.id}`) }),
     ]) : el('p', { class: 'muted', text: 'Добавь день в плане.' }),
+    cb ? el('div', { class: 'wk-banner' + (cb.reduced ? '' : ' soft'), text: comebackNote(cb) }) : null,
   ]);
 
   // --- Квесты недели ---

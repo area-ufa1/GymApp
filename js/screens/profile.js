@@ -154,8 +154,9 @@ function settingsSection(state, ctx) {
 
 function planEditor(state, ctx) {
   const days = state.plan.days.map(day => {
-    const exItems = day.exercises.map(ex => el('div', { class: 'pe-ex' }, [
+    const exItems = day.exercises.map(ex => el('div', { class: 'pe-ex' + (ex.isAccessory ? ' pe-ex-acc' : '') }, [
       el('span', { class: 'pe-ex-name', text: ex.name }),
+      ex.isAccessory ? el('span', { class: 'pe-tag', text: 'доп' }) : null,
       el('span', { class: 'pe-ex-meta', text: `${ex.sets}×${ex.repsMin}–${ex.repsMax}` }),
       el('button', { class: 'icon-btn', text: '✎', onClick: () => editExercise(state, day, ex, ctx) }),
       el('button', { class: 'icon-btn', text: '✕', onClick: () => { day.exercises = day.exercises.filter(e => e !== ex); save(); ctx.rerender(); } }),
@@ -186,6 +187,8 @@ function editExercise(state, day, ex, ctx) {
   const rmax = el('input', { type: 'number', class: 'set-input', value: ex ? ex.repsMax : 12 });
   const muscle = el('select', { class: 'set-input wide' }, MUSCLE_GROUPS.map(g =>
     el('option', { value: g, text: g, selected: (ex ? (ex.muscle || inferMuscle(ex.name)) : 'Прочее') === g })));
+  const accessory = el('input', { type: 'checkbox' });
+  accessory.checked = !!(ex && ex.isAccessory);
   const body = el('div', { class: 'edit-form' }, [
     el('label', { text: 'Упражнение' }), name,
     el('label', { text: 'Группа мышц' }), muscle,
@@ -194,11 +197,15 @@ function editExercise(state, day, ex, ctx) {
       el('label', {}, [el('span', { text: 'Повт. от' }), rmin]),
       el('label', {}, [el('span', { text: 'Повт. до' }), rmax]),
     ]),
+    el('label', { class: 'toggle-row' }, [
+      el('span', { text: 'Дополнительное (скрывать в короткой версии)' }),
+      el('span', { class: 'switch' }, [accessory, el('span', { class: 'slider' })]),
+    ]),
   ]);
   const close = modal(ex ? 'Изменить упражнение' : 'Новое упражнение', body, [
     el('button', { class: 'btn btn-primary', text: 'Сохранить', onClick: () => {
       if (!name.value.trim()) { toast('Введите название', 'warn'); return; }
-      const data = { name: name.value.trim(), muscle: muscle.value, sets: +sets.value || 1, repsMin: +rmin.value || 1, repsMax: +rmax.value || 1 };
+      const data = { name: name.value.trim(), muscle: muscle.value, sets: +sets.value || 1, repsMin: +rmin.value || 1, repsMax: +rmax.value || 1, isAccessory: accessory.checked };
       if (ex) Object.assign(ex, data); else day.exercises.push({ id: uid('ex'), ...data });
       save(); close(); ctx.rerender();
     } }),

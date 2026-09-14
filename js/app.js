@@ -60,6 +60,8 @@ function init() {
   save();
   if (!location.hash) location.hash = '#home';
   rerender();
+  // Зависшая тренировка (старше двух дней) — предложить продолжить или выбросить.
+  workout.promptStaleWorkout({ navigate, rerender, param: undefined });
   scheduleReminder();
 
   if ('serviceWorker' in navigator) {

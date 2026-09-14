@@ -186,29 +186,38 @@ export function previousSessionForDay(state, dayId, beforeId = null) {
   return list[0] ? list[0].s : null;
 }
 
-// Цвет подхода vs тот же подход в прошлой сессии: 'green' | 'yellow' | 'red' | null.
-export function compareSet(prevSession, exerciseId, setIdx, set) {
-  if (!prevSession) return null;
-  const pe = (prevSession.entries || []).find(e => e.exerciseId === exerciseId);
-  if (!pe) return null;
-  const ps = pe.sets[setIdx];
-  if (!ps || !ps.w || !set || !set.w) return null;
+// Цвет подхода vs планка: 'green' | 'yellow' | 'red' | null.
+// Обычно планка — тот же подход в прошлой сессии. В режиме возвращения передаётся
+// targetRm (1ПМ скорректированной цели): планка берётся по наименьшему из двух,
+// чтобы сниженная цель никогда не была строже обычного сравнения.
+export function compareSet(prevSession, exerciseId, setIdx, set, targetRm = null) {
+  if (!set || !set.w || !set.reps) return null;
+  let base = null;
+  if (prevSession) {
+    const pe = (prevSession.entries || []).find(e => e.exerciseId === exerciseId);
+    const ps = pe && pe.sets[setIdx];
+    if (ps && ps.w) base = epley1RM(ps.w, ps.reps);
+  }
+  if (targetRm > 0) base = (base == null) ? targetRm : Math.min(base, targetRm);
+  if (!(base > 0)) return null;
   const a = epley1RM(set.w, set.reps);
-  const b = epley1RM(ps.w, ps.reps);
-  if (a > b + 0.5) return 'green';
-  if (a < b - 0.5) return 'red';
+  if (a > base + 0.5) return 'green';
+  if (a < base - 0.5) return 'red';
   return 'yellow';
 }
 
 // ---- Завершение тренировки: пишет сессию, начисляет XP, обновляет серию ----
-export function finalizeWorkout(state, session) {
+// targetRms — {exerciseId: 1ПМ скорректированной цели} для режима возвращения;
+// XP и серия при этом начисляются обычным порядком, без штрафа за сниженный объём.
+export function finalizeWorkout(state, session, targetRms = null) {
   const prev = previousSessionForDay(state, session.dayId);
   let completedSets = 0, greenSets = 0;
   for (const e of session.entries) {
+    const targetRm = targetRms ? targetRms[e.exerciseId] : null;
     e.sets.forEach((s, i) => {
       if (s && s.w && s.reps) {
         completedSets++;
-        if (compareSet(prev, e.exerciseId, i, s) === 'green') greenSets++;
+        if (compareSet(prev, e.exerciseId, i, s, targetRm) === 'green') greenSets++;
       }
     });
   }

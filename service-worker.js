@@ -1,5 +1,5 @@
 // Офлайн-кэш оболочки приложения. Стратегия: cache-first для своих ассетов.
-const CACHE = 'gymquest-v3';
+const CACHE = 'gymquest-v4';
 const ASSETS = [
   './',
   './index.html',
@@ -11,6 +11,7 @@ const ASSETS = [
   './js/store.js',
   './js/models.js',
   './js/lib/calc.js',
+  './js/lib/comeback.js',
   './js/lib/dom.js',
   './js/lib/chart.js',
   './js/lib/analytics.js',
