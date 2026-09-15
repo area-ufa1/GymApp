@@ -11,10 +11,10 @@ export const SEED_PLAN = {
       exercises: [
         { name: 'Жим гантелей сидя', sets: 4, repsMin: 6, repsMax: 10, muscle: 'Плечи' },
         { name: 'Подтягивания широким хватом / тяга верхнего блока', sets: 4, repsMin: 8, repsMax: 12, muscle: 'Спина' },
-        { name: 'Пуловер (гантель / блок)', sets: 3, repsMin: 10, repsMax: 15, muscle: 'Спина' },
+        { name: 'Пуловер (гантель / блок)', sets: 3, repsMin: 10, repsMax: 15, muscle: 'Спина', isAccessory: true },
         { name: 'Махи гантелями в стороны', sets: 4, repsMin: 12, repsMax: 20, muscle: 'Плечи' },
         { name: 'Тяга в наклоне', sets: 3, repsMin: 8, repsMax: 12, muscle: 'Спина' },
-        { name: 'Махи в наклоне (задние дельты)', sets: 3, repsMin: 15, repsMax: 20, muscle: 'Плечи' },
+        { name: 'Махи в наклоне (задние дельты)', sets: 3, repsMin: 15, repsMax: 20, muscle: 'Плечи', isAccessory: true },
       ],
     },
     {
@@ -56,6 +56,13 @@ export const SEED_PLAN = {
       ],
     },
   ],
+};
+
+// Упражнения, которые по умолчанию считаются дополнительными (короткая версия их скрывает).
+// Проставляются старым планам, где поле isAccessory ещё не задано. Остальные дни
+// пользователь размечает сам в редакторе плана.
+export const DEFAULT_ACCESSORY = {
+  d1: ['Пуловер (гантель / блок)', 'Махи в наклоне (задние дельты)'],
 };
 
 // Стартовые силовые (из листа «Сила и 1ПМ»), формат «вес×повт».
